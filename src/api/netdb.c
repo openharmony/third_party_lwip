@@ -389,6 +389,7 @@ lwip_getaddrinfo(const char *nodename, const char *servname,
     sa6->sin6_port = lwip_htons((u16_t)port_nr);
     sa6->sin6_scope_id = ip6_addr_zone(ip_2_ip6(&addr));
     ai->ai_family = AF_INET6;
+    ai->ai_addrlen = sizeof(struct sockaddr_in6);
 #endif /* LWIP_IPV6 */
   } else {
 #if LWIP_IPV4
@@ -401,6 +402,7 @@ lwip_getaddrinfo(const char *nodename, const char *servname,
 #endif /* LWIP_SOCKET_HAVE_SA_LEN */
     sa4->sin_port = lwip_htons((u16_t)port_nr);
     ai->ai_family = AF_INET;
+    ai->ai_addrlen = sizeof(struct sockaddr_in);
 #endif /* LWIP_IPV4 */
   }
 
@@ -416,7 +418,6 @@ lwip_getaddrinfo(const char *nodename, const char *servname,
     MEMCPY(ai->ai_canonname, nodename, namelen);
     ai->ai_canonname[namelen] = 0;
   }
-  ai->ai_addrlen = sizeof(struct sockaddr_storage);
   ai->ai_addr = (struct sockaddr *)sa;
 
   *res = ai;
