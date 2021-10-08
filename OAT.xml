@@ -51,9 +51,15 @@
         <filefilterlist>
             <filefilter name="defaultFilter" desc="Files not to check">
                 <filteritem type="filename" name="*.c" desc="Lwip uses the BSD protocol, the copying notice in all files are the original code."/>
-				<filteritem type="filename" name="*.h" desc="Lwip uses the BSD protocol, the copying notice in all files are the original code."/>
-				<filteritem type="filename" name="*.bin" desc="Lwip uses the BSD protocol, the copying notice in all files are the original code."/>
-				<filteritem type="filename" name="*Doxyfile*" desc="doxy file, not license statement."/>
+                <filteritem type="filename" name="*.h" desc="Lwip uses the BSD protocol, the copying notice in all files are the original code."/>
+                <filteritem type="filename" name="*.bin" desc="Lwip uses the BSD protocol, the copying notice in all files are the original code."/>
+                <filteritem type="filename" name="*Doxyfile*" desc="doxy file, not license statement."/>
+            </filefilter>
+            <filefilter name="binaryFileTypePolicyFilter" desc="Filters for binary file policies">^M
+                <!--filteritem type="filename" name="*.uvwxyz" desc="Describe the reason for filtering scan results"/-->^M
+                <filteritem type="filepath" name="test/.*" desc="官方自带文件"/>^M
+                <filteritem type="filepath" name="src/apps/http/fs/img/.*" desc="官方自带文件"/>^M
+                <!--filteritem type="filepath" name="projectroot/[a-zA-Z0-9]{20,}.sh" desc="Temp files"/-->^M
             </filefilter>
         </filefilterlist>
     </oatconfig>
