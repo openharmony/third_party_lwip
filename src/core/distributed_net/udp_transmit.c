@@ -29,7 +29,7 @@
 
 #include "lwip/opt.h"
 
-#if LWIP_ENABLE_DISTRIBUTED_NET
+#if LWIP_ENABLE_DISTRIBUTED_NET && LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
 
 #include "lwip/distributed_net/udp_transmit.h"
 
@@ -131,4 +131,4 @@ ssize_t udp_transmit_sendmsg(int sock, const struct msghdr *hdr)
   return ret;
 }
 
-#endif /* LWIP_ENABLE_DISTRIBUTED_NET */
+#endif /* LWIP_ENABLE_DISTRIBUTED_NET && LWIP_USE_GET_HOST_BY_NAME_EXTERNAL */

@@ -71,6 +71,25 @@ int distributed_net_connect(int sock, const struct sockaddr *addr, socklen_t add
   return 0;
 }
 
+int distributed_net_close(int sock)
+{
+  CHECK_PARA(SOCKET_TO_INDEX(sock) >= 0 && SOCKET_TO_INDEX(sock) < NUM_SOCKETS, EBADF);
+
+  reset_distributed_net_socket(sock);
+  return lwip_close_internal(sock);
+}
+
+#if LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
+typedef union {
+  struct sockaddr sa;
+#if LWIP_IPV6
+  struct sockaddr_in6 sin6;
+#endif /* LWIP_IPV6 */
+#if LWIP_IPV4
+  struct sockaddr_in sin;
+#endif /* LWIP_IPV4 */
+} aligned_sockaddr;
+
 ssize_t distributed_net_sendto(int sock, const void *buf, size_t buf_len, int flags, const struct sockaddr *addr,
                                socklen_t addr_len)
 {
@@ -112,6 +131,7 @@ ssize_t distributed_net_sendto(int sock, const void *buf, size_t buf_len, int fl
   return ret > 0 ? UDP_PAYLOAD_LEN(ret) : -1;
 }
 
+#if LWIP_DISTRIBUTED_NET_ENABLE_SENDMSG
 ssize_t distributed_net_sendmsg(int sock, const struct msghdr *hdr, int flags)
 {
   CHECK_PARA(SOCKET_TO_INDEX(sock) >= 0 && SOCKET_TO_INDEX(sock) < NUM_SOCKETS, EBADF);
@@ -155,25 +175,7 @@ ssize_t distributed_net_sendmsg(int sock, const struct msghdr *hdr, int flags)
   ssize_t ret = udp_transmit_sendmsg(sock, hdr);
   return ret > 0 ? UDP_PAYLOAD_LEN(ret) : -1;
 }
-
-int distributed_net_close(int sock)
-{
-  CHECK_PARA(SOCKET_TO_INDEX(sock) >= 0 && SOCKET_TO_INDEX(sock) < NUM_SOCKETS, EBADF);
-
-  reset_distributed_net_socket(sock);
-  return lwip_close_internal(sock);
-}
-
-#if LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
-typedef union {
-  struct sockaddr sa;
-#if LWIP_IPV6
-  struct sockaddr_in6 sin6;
-#endif /* LWIP_IPV6 */
-#if LWIP_IPV4
-  struct sockaddr_in sin;
-#endif /* LWIP_IPV4 */
-} aligned_sockaddr;
+#endif /* LWIP_DISTRIBUTED_NET_ENABLE_SENDMSG */
 
 ssize_t distributed_net_recvfrom(int sock, void *buf, size_t buf_len, int flags, struct sockaddr *from,
                                  socklen_t *from_len)

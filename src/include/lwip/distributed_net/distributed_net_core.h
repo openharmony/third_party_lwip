@@ -59,14 +59,14 @@ typedef struct tcp_connect_data {
 
 int distributed_net_connect(int sock, const struct sockaddr *addr, socklen_t addr_len);
 
+int distributed_net_close(int sock);
+
+#if LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
 ssize_t distributed_net_sendto(int sock, const void *buf, size_t buf_len, int flags, const struct sockaddr *addr,
                                socklen_t addr_len);
 
 ssize_t distributed_net_sendmsg(int sock, const struct msghdr *hdr, int flags);
 
-int distributed_net_close(int sock);
-
-#if LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
 ssize_t distributed_net_recvfrom(int sock, void *buf, size_t buf_len, int flags, struct sockaddr *from,
                                  socklen_t *from_len);
 #endif /* LWIP_USE_GET_HOST_BY_NAME_EXTERNAL */

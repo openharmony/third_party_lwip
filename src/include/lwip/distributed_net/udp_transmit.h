@@ -32,7 +32,7 @@
 
 #include "lwip/opt.h"
 
-#if LWIP_ENABLE_DISTRIBUTED_NET
+#if LWIP_ENABLE_DISTRIBUTED_NET && LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
 
 #include "lwip/distributed_net/distributed_net.h"
 #include "lwip/sockets.h"
@@ -53,6 +53,6 @@ ssize_t udp_transmit_sendto(int sock, const void *buf, size_t buf_len, const str
 
 ssize_t udp_transmit_sendmsg(int sock, const struct msghdr *hdr);
 
-#endif /* LWIP_ENABLE_DISTRIBUTED_NET */
+#endif /* LWIP_ENABLE_DISTRIBUTED_NET && LWIP_USE_GET_HOST_BY_NAME_EXTERNAL */
 
 #endif /* LWIP_HDR_UDP_TRANSMIT_H */
