@@ -94,11 +94,16 @@ ssize_t distributed_net_sendto(int sock, const void *buf, size_t buf_len, int fl
     (void)memcpy_s(&addr_in, sizeof(addr_in), addr, MIN(sizeof(addr_in), addr_len));
   }
 
+  if (IS_LOCAL_UDP_SERVER_ADDR(&addr_in)) {
+    set_errno(EPERM);
+    return -1;
+  }
+
   if (is_no_proxy_network_segment(&addr_in)) {
     return lwip_sendto_internal(sock, buf, buf_len, flags, addr, addr_len);
   }
 
-  if (!IS_DNS_PORT(addr_in) || IS_LOCAL_UDP_SERVER_ADDR(&addr_in)) {
+  if (!IS_DNS_PORT(addr_in)) {
     set_errno(EPERM);
     return -1;
   }
@@ -133,11 +138,16 @@ ssize_t distributed_net_sendmsg(int sock, const struct msghdr *hdr, int flags)
     (void)memcpy_s(&addr_in, sizeof(addr_in), addr, MIN(sizeof(addr_in), addr_len));
   }
 
+  if (IS_LOCAL_UDP_SERVER_ADDR(&addr_in)) {
+    set_errno(EPERM);
+    return -1;
+  }
+
   if (is_no_proxy_network_segment(&addr_in)) {
     return lwip_sendmsg_internal(sock, hdr, flags);
   }
 
-  if (!IS_DNS_PORT(addr_in) || IS_LOCAL_UDP_SERVER_ADDR(&addr_in)) {
+  if (!IS_DNS_PORT(addr_in)) {
     set_errno(EPERM);
     return -1;
   }
