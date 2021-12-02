@@ -60,7 +60,7 @@ static int try_connect_to_local_tcp_server(u16_t tcp_port)
   (void)lwip_close_internal(sock);
   return ret;
 }
-#endif
+#endif /* LWIP_DISTRIBUTED_NET_TRY_CONNECT */
 
 void set_distributed_net_socket(int sock)
 {
@@ -101,7 +101,7 @@ u16_t get_local_udp_server_port(void)
 u8_t is_distributed_net_enabled(void)
 {
   sys_mutex_lock(&g_mutex);
-  u16_t ret = g_is_distributed_net_enabled;
+  u8_t ret = g_is_distributed_net_enabled;
   sys_mutex_unlock(&g_mutex);
   return ret;
 }
@@ -121,7 +121,7 @@ int enable_distributed_net(u16_t tcp_port, u16_t udp_port)
   if (try_connect_to_local_tcp_server(tcp_port) < 0) {
     return -1;
   }
-#endif
+#endif /* LWIP_DISTRIBUTED_NET_TRY_CONNECT */
 
   sys_mutex_lock(&g_mutex);
   g_is_distributed_net_enabled = 1;

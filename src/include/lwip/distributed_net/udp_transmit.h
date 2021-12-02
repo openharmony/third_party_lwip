@@ -37,9 +37,9 @@
 #include "lwip/distributed_net/distributed_net.h"
 #include "lwip/sockets.h"
 
-#define MAX_UDP_PAYLOAD_LEN 2048
+#define MAX_UDP_PAYLOAD_LEN 1024
 
-#define MAX_IOV_NUM 2048
+#define MAX_IOV_NUM 32
 
 #define UDP_PAYLOAD_LEN(send_len) ((send_len) - (ssize_t)sizeof(udp_data))
 

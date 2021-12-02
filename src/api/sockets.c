@@ -1235,7 +1235,8 @@ lwip_recvfrom(int s, void *mem, size_t len, int flags,
 }
 
 ssize_t
-lwip_recvfrom_internal(int s, void *mem, size_t len, int flags, struct sockaddr *from, socklen_t *fromlen)
+lwip_recvfrom_internal(int s, void *mem, size_t len, int flags,
+                       struct sockaddr *from, socklen_t *fromlen)
 {
 #endif
   struct lwip_sock *sock;
