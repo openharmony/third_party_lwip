@@ -612,16 +612,19 @@ int lwip_inet_pton(int af, const char *src, void *dst);
 
 int lwip_connect_internal(int s, const struct sockaddr *name, socklen_t namelen);
 
+int lwip_close_internal(int s);
+
+#if LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
 ssize_t lwip_sendto_internal(int s, const void *data, size_t size, int flags, const struct sockaddr *to,
                              socklen_t tolen);
 
+#if LWIP_DISTRIBUTED_NET_ENABLE_SENDMSG
 ssize_t lwip_sendmsg_internal(int s, const struct msghdr *msg, int flags);
+#endif
 
-#if LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
 ssize_t lwip_recvfrom_internal(int s, void *mem, size_t len, int flags, struct sockaddr *from, socklen_t *fromlen);
 #endif /* LWIP_USE_GET_HOST_BY_NAME_EXTERNAL */
 
-int lwip_close_internal(int s);
 #endif
 
 #if LWIP_COMPAT_SOCKETS
