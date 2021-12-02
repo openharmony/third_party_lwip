@@ -84,7 +84,11 @@ ssize_t udp_transmit_sendto(int sock, const void *buf, size_t buf_len, const str
   send_hdr.msg_iov = iov;
   send_hdr.msg_iovlen = 2;
 
+#if LWIP_DISTRIBUTED_NET_ENABLE_SENDMSG
   return lwip_sendmsg_internal(sock, &send_hdr, 0);
+#else
+  return lwip_sendmsg(sock, &send_hdr, 0);
+#endif
 }
 
 ssize_t udp_transmit_sendmsg(int sock, const struct msghdr *hdr)
@@ -126,7 +130,11 @@ ssize_t udp_transmit_sendmsg(int sock, const struct msghdr *hdr)
   send_hdr.msg_iov = iov;
   send_hdr.msg_iovlen = hdr->msg_iovlen + 1;
 
+#if LWIP_DISTRIBUTED_NET_ENABLE_SENDMSG
   ssize_t ret = lwip_sendmsg_internal(sock, &send_hdr, 0);
+#else
+  ssize_t ret = lwip_sendmsg(sock, &send_hdr, 0);
+#endif
   mem_free(iov);
   return ret;
 }
