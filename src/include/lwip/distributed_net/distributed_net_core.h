@@ -65,7 +65,9 @@ int distributed_net_close(int sock);
 ssize_t distributed_net_sendto(int sock, const void *buf, size_t buf_len, int flags, const struct sockaddr *addr,
                                socklen_t addr_len);
 
+#if LWIP_DISTRIBUTED_NET_ENABLE_SENDMSG
 ssize_t distributed_net_sendmsg(int sock, const struct msghdr *hdr, int flags);
+#endif
 
 ssize_t distributed_net_recvfrom(int sock, void *buf, size_t buf_len, int flags, struct sockaddr *from,
                                  socklen_t *from_len);
