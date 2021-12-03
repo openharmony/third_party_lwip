@@ -36,6 +36,29 @@
 #include "lwip/distributed_net/udp_transmit.h"
 #include "lwip/priv/sockets_priv.h"
 
+#define DISTRIBUTED_NET_SET_NONBLOCK_FLAG(flags, sock) \
+  do { \
+    if ((flags) & (O_NONBLOCK)) { \
+      make_nonblock((sock), 1); \
+    } \
+  } while (0)
+
+#define DISTRIBUTED_NET_RESET_NONBLOCK_FLAG(flags, sock) \
+  do { \
+    if ((flags) & (O_NONBLOCK)) { \
+      make_nonblock((sock), 0); \
+    } \
+  } while (0)
+
+static int make_nonblock(int sock, int nonblock)
+{
+  int flags = lwip_fcntl(sock, F_GETFL, 0);
+  if (nonblock) {
+    return lwip_fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+  }
+  return lwip_fcntl(sock, F_SETFL, flags & (~O_NONBLOCK));
+}
+
 int distributed_net_connect(int sock, const struct sockaddr *addr, socklen_t addr_len)
 {
   CHECK_PARA(SOCKET_TO_INDEX(sock) >= 0 && SOCKET_TO_INDEX(sock) < NUM_SOCKETS, EBADF);
@@ -51,7 +74,10 @@ int distributed_net_connect(int sock, const struct sockaddr *addr, socklen_t add
 
   (void)memset_s(&addr_in, sizeof(addr_in), 0, sizeof(addr_in));
   INIT_SOCK_ADDR(&addr_in, LOCAL_SERVER_IP, get_local_tcp_server_port());
+  int flags = lwip_fcntl(sock, F_GETFL, 0);
+  DISTRIBUTED_NET_RESET_NONBLOCK_FLAG(flags, sock);
   if (lwip_connect_internal(sock, (struct sockaddr *)&addr_in, sizeof(addr_in)) < 0) {
+    DISTRIBUTED_NET_SET_NONBLOCK_FLAG(flags, sock);
     return -1;
   }
   set_distributed_net_socket(sock);
@@ -66,8 +92,10 @@ int distributed_net_connect(int sock, const struct sockaddr *addr, socklen_t add
 
   if (lwip_send(sock, &data, sizeof(data), 0) < 0) {
     reset_distributed_net_socket(sock);
+    DISTRIBUTED_NET_SET_NONBLOCK_FLAG(flags, sock);
     return -1;
   }
+  DISTRIBUTED_NET_SET_NONBLOCK_FLAG(flags, sock);
   return 0;
 }
 
