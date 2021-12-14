@@ -608,6 +608,25 @@ int lwip_fcntl(int s, int cmd, int val);
 const char *lwip_inet_ntop(int af, const void *src, char *dst, socklen_t size);
 int lwip_inet_pton(int af, const char *src, void *dst);
 
+#if LWIP_ENABLE_DISTRIBUTED_NET
+
+int lwip_connect_internal(int s, const struct sockaddr *name, socklen_t namelen);
+
+int lwip_close_internal(int s);
+
+#if LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
+ssize_t lwip_sendto_internal(int s, const void *data, size_t size, int flags, const struct sockaddr *to,
+                             socklen_t tolen);
+
+#if LWIP_DISTRIBUTED_NET_ENABLE_SENDMSG
+ssize_t lwip_sendmsg_internal(int s, const struct msghdr *msg, int flags);
+#endif
+
+ssize_t lwip_recvfrom_internal(int s, void *mem, size_t len, int flags, struct sockaddr *from, socklen_t *fromlen);
+#endif /* LWIP_USE_GET_HOST_BY_NAME_EXTERNAL */
+
+#endif
+
 #if LWIP_COMPAT_SOCKETS
 #if LWIP_COMPAT_SOCKETS != 2
 /** @ingroup socket */
