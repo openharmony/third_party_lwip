@@ -32,7 +32,15 @@
 
 #include "lwip/opt.h"
 
-#if LWIP_ENABLE_DISTRIBUTED_NET && LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
+#if LWIP_ENABLE_DISTRIBUTED_NET
+
+typedef struct udp_data {
+  char dest_addr[IP4_MAX_ADDR_LEN];
+  u32_t dest_port;
+  char payload[];
+} udp_data;
+
+#if LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
 
 #include "lwip/distributed_net/distributed_net.h"
 #include "lwip/sockets.h"
@@ -43,16 +51,12 @@
 
 #define UDP_PAYLOAD_LEN(send_len) ((send_len) - (ssize_t)sizeof(udp_data))
 
-typedef struct udp_data {
-  char dest_addr[IP4_MAX_ADDR_LEN];
-  u32_t dest_port;
-  char payload[];
-} udp_data;
-
 ssize_t udp_transmit_sendto(int sock, const void *buf, size_t buf_len, const struct sockaddr_in *dest_addr);
 
 ssize_t udp_transmit_sendmsg(int sock, const struct msghdr *hdr);
 
-#endif /* LWIP_ENABLE_DISTRIBUTED_NET && LWIP_USE_GET_HOST_BY_NAME_EXTERNAL */
+#endif /* LWIP_USE_GET_HOST_BY_NAME_EXTERNAL */
+
+#endif /* LWIP_ENABLE_DISTRIBUTED_NET */
 
 #endif /* LWIP_HDR_UDP_TRANSMIT_H */
