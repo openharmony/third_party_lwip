@@ -1,4 +1,4 @@
-INTRODUCTION
+# INTRODUCTION
 
 lwIP is a small independent implementation of the TCP/IP protocol suite.
 
@@ -11,7 +11,7 @@ lwIP was originally developed by Adam Dunkels at the Computer and Networks
 Architectures (CNA) lab at the Swedish Institute of Computer Science (SICS)
 and is now developed and maintained by a worldwide network of developers.
 
-FEATURES
+# FEATURES
 
   * IP (Internet Protocol, IPv4 and IPv6) including packet forwarding over
     multiple network interfaces
@@ -35,7 +35,7 @@ FEATURES
   * 6LoWPAN (via IEEE 802.15.4, BLE or ZEP)
 
 
-APPLICATIONS
+# APPLICATIONS
 
   * HTTP server with SSI and CGI (HTTPS via altcp)
   * SNMPv2c agent with MIB compiler (Simple Network Management Protocol), v3 via altcp
@@ -46,12 +46,12 @@ APPLICATIONS
   * MQTT client (TLS support via altcp)
 
 
-LICENSE
+# LICENSE
 
 lwIP is freely available under a BSD license.
 
 
-DEVELOPMENT
+# DEVELOPMENT
 
 lwIP has grown into an excellent TCP/IP stack for embedded devices,
 and developers using the stack often submit bug fixes, improvements,
@@ -80,7 +80,7 @@ Continuous integration builds (GCC, clang):
   https://travis-ci.org/yarrick/lwip-merged
 
 
-DOCUMENTATION
+# DOCUMENTATION
 
 Self documentation of the source code is regularly extracted from the current
 Git sources and is available from this web page:
