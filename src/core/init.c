@@ -241,6 +241,7 @@ PACK_STRUCT_END
 // #error "For LWIP_NETCONN_FULLDUPLEX to work, LWIP_NETCONN_SEM_PER_THREAD is required"
 // #endif
 
+
 /* Compile-time checks for deprecated options.
  */
 #ifdef MEMP_NUM_TCPIP_MSG
