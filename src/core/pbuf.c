@@ -271,7 +271,7 @@ pbuf_alloc(pbuf_layer layer, u16_t length, pbuf_type type)
       break;
     }
     case PBUF_RAM: {
-      u16_t payload_len = (u16_t)(LWIP_MEM_ALIGN_SIZE(offset) + LWIP_MEM_ALIGN_SIZE(length));
+      mem_size_t payload_len = (mem_size_t)(LWIP_MEM_ALIGN_SIZE(offset) + LWIP_MEM_ALIGN_SIZE(length));
       mem_size_t alloc_len = (mem_size_t)(LWIP_MEM_ALIGN_SIZE(SIZEOF_STRUCT_PBUF) + payload_len);
 
       /* bug #50040: Check for integer overflow when calculating alloc_len */
@@ -960,55 +960,11 @@ pbuf_dechain(struct pbuf *p)
 err_t
 pbuf_copy(struct pbuf *p_to, const struct pbuf *p_from)
 {
-  size_t offset_to = 0, offset_from = 0, len;
-
   LWIP_DEBUGF(PBUF_DEBUG | LWIP_DBG_TRACE, ("pbuf_copy(%p, %p)\n",
               (const void *)p_to, (const void *)p_from));
 
-  /* is the target big enough to hold the source? */
-  LWIP_ERROR("pbuf_copy: target not big enough to hold source", ((p_to != NULL) &&
-             (p_from != NULL) && (p_to->tot_len >= p_from->tot_len)), return ERR_ARG;);
-
-  /* iterate through pbuf chain */
-  do {
-    /* copy one part of the original chain */
-    if ((p_to->len - offset_to) >= (p_from->len - offset_from)) {
-      /* complete current p_from fits into current p_to */
-      len = p_from->len - offset_from;
-    } else {
-      /* current p_from does not fit into current p_to */
-      len = p_to->len - offset_to;
-    }
-    MEMCPY((u8_t *)p_to->payload + offset_to, (u8_t *)p_from->payload + offset_from, len);
-    offset_to += len;
-    offset_from += len;
-    LWIP_ASSERT("offset_to <= p_to->len", offset_to <= p_to->len);
-    LWIP_ASSERT("offset_from <= p_from->len", offset_from <= p_from->len);
-    if (offset_from >= p_from->len) {
-      /* on to next p_from (if any) */
-      offset_from = 0;
-      p_from = p_from->next;
-    }
-    if (offset_to == p_to->len) {
-      /* on to next p_to (if any) */
-      offset_to = 0;
-      p_to = p_to->next;
-      LWIP_ERROR("p_to != NULL", (p_to != NULL) || (p_from == NULL), return ERR_ARG;);
-    }
-
-    if ((p_from != NULL) && (p_from->len == p_from->tot_len)) {
-      /* don't copy more than one packet! */
-      LWIP_ERROR("pbuf_copy() does not allow packet queues!",
-                 (p_from->next == NULL), return ERR_VAL;);
-    }
-    if ((p_to != NULL) && (p_to->len == p_to->tot_len)) {
-      /* don't copy more than one packet! */
-      LWIP_ERROR("pbuf_copy() does not allow packet queues!",
-                 (p_to->next == NULL), return ERR_VAL;);
-    }
-  } while (p_from);
-  LWIP_DEBUGF(PBUF_DEBUG | LWIP_DBG_TRACE, ("pbuf_copy: end of chain reached.\n"));
-  return ERR_OK;
+  LWIP_ERROR("pbuf_copy: invalid source", p_from != NULL, return ERR_ARG;);
+  return pbuf_copy_partial_pbuf(p_to, p_from, p_from->tot_len, 0);
 }
 
 /**
@@ -1031,7 +987,8 @@ pbuf_copy(struct pbuf *p_to, const struct pbuf *p_from)
 err_t
 pbuf_copy_partial_pbuf(struct pbuf *p_to, const struct pbuf *p_from, u16_t copy_len, u16_t offset)
 {
-  size_t offset_to = offset, offset_from = 0, len;
+  size_t offset_to = offset, offset_from = 0, len_calc;
+  u16_t len;
 
   LWIP_DEBUGF(PBUF_DEBUG | LWIP_DBG_TRACE, ("pbuf_copy_partial_pbuf(%p, %p, %"U16_F", %"U16_F")\n",
               (const void *)p_to, (const void *)p_from, copy_len, offset));
@@ -1048,12 +1005,12 @@ pbuf_copy_partial_pbuf(struct pbuf *p_to, const struct pbuf *p_from, u16_t copy_
     /* copy one part of the original chain */
     if ((p_to->len - offset_to) >= (p_from->len - offset_from)) {
       /* complete current p_from fits into current p_to */
-      len = p_from->len - offset_from;
+      len_calc = p_from->len - offset_from;
     } else {
       /* current p_from does not fit into current p_to */
-      len = p_to->len - offset_to;
+      len_calc = p_to->len - offset_to;
     }
-    len = LWIP_MIN(copy_len, len);
+    len = (u16_t)LWIP_MIN(copy_len, len_calc);
     MEMCPY((u8_t *)p_to->payload + offset_to, (u8_t *)p_from->payload + offset_from, len);
     offset_to += len;
     offset_from += len;
