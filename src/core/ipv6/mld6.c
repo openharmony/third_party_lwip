@@ -320,7 +320,11 @@ mld6_joingroup(const ip6_addr_t *srcaddr, const ip6_addr_t *groupaddr)
   LWIP_ASSERT_CORE_LOCKED();
 
   /* loop through netif's */
+#ifdef LOSCFG_NET_CONTAINER
+  NETIF_FOREACH(netif, get_root_net_group()) {
+#else
   NETIF_FOREACH(netif) {
+#endif
     /* Should we join this interface ? */
     if (ip6_addr_isany(srcaddr) ||
         netif_get_ip6_addr_match(netif, srcaddr) >= 0) {
@@ -409,7 +413,11 @@ mld6_leavegroup(const ip6_addr_t *srcaddr, const ip6_addr_t *groupaddr)
   LWIP_ASSERT_CORE_LOCKED();
 
   /* loop through netif's */
+#ifdef LOSCFG_NET_CONTAINER
+  NETIF_FOREACH(netif, get_root_net_group()) {
+#else
   NETIF_FOREACH(netif) {
+#endif
     /* Should we leave this interface ? */
     if (ip6_addr_isany(srcaddr) ||
         netif_get_ip6_addr_match(netif, srcaddr) >= 0) {
@@ -497,7 +505,11 @@ mld6_tmr(void)
 {
   struct netif *netif;
 
+#ifdef LOSCFG_NET_CONTAINER
+  NETIF_FOREACH(netif, get_root_net_group()) {
+#else
   NETIF_FOREACH(netif) {
+#endif
     struct mld_group *group = netif_mld6_data(netif);
 
     while (group != NULL) {

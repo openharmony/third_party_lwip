@@ -57,6 +57,9 @@
 #include "lwip/nd6.h"
 #include "lwip/mld6.h"
 #include "lwip/api.h"
+#ifdef LOSCFG_NET_CONTAINER
+#include "lwip/net_group.h"
+#endif
 
 #include "netif/ppp/ppp_opts.h"
 #include "netif/ppp/ppp_impl.h"
@@ -359,7 +362,11 @@ lwip_init(void)
   mem_init();
   memp_init();
   pbuf_init();
+#ifdef LOSCFG_NET_CONTAINER
+  netif_init(get_root_net_group());
+#else
   netif_init();
+#endif
 #if LWIP_IPV4
   ip_init();
 #if LWIP_ARP

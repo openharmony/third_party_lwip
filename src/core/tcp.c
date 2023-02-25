@@ -194,6 +194,17 @@ static err_t tcp_close_shutdown_fin(struct tcp_pcb *pcb);
 static void tcp_ext_arg_invoke_callbacks_destroyed(struct tcp_pcb_ext_args *ext_args);
 #endif
 
+#ifdef LOSCFG_NET_CONTAINER
+void set_tcp_pcb_net_group(struct tcp_pcb *pcb, struct net_group *group)
+{
+  set_ippcb_net_group((struct ip_pcb *)pcb, group);
+}
+
+struct net_group *get_net_group_from_tcp_pcb(const struct tcp_pcb *pcb)
+{
+  return get_net_group_from_ippcb((struct ip_pcb *)pcb);
+}
+#endif
 /**
  * Initialize this module.
  */
@@ -715,7 +726,11 @@ tcp_bind(struct tcp_pcb *pcb, const ip_addr_t *ipaddr, u16_t port)
     /* Check if the address already is in use (on all lists) */
     for (i = 0; i < max_pcb_list; i++) {
       for (cpcb = *tcp_pcb_lists[i]; cpcb != NULL; cpcb = cpcb->next) {
+#ifdef LOSCFG_NET_CONTAINER
+        if (cpcb->local_port == port && (get_net_group_from_tcp_pcb(pcb) == get_net_group_from_tcp_pcb(cpcb))) {
+#else
         if (cpcb->local_port == port) {
+#endif
 #if SO_REUSE
           /* Omit checking for the same port if both pcbs have REUSEADDR set.
              For SO_REUSEADDR, the duplicate-check for a 5-tuple is done in
@@ -885,6 +900,9 @@ tcp_listen_with_backlog_and_err(struct tcp_pcb *pcb, u8_t backlog, err_t *err)
     res = ERR_MEM;
     goto done;
   }
+#ifdef LOSCFG_NET_CONTAINER
+  set_tcp_pcb_net_group((struct tcp_pcb *)lpcb, get_net_group_from_tcp_pcb(pcb));
+#endif
   lpcb->callback_arg = pcb->callback_arg;
   lpcb->local_port = pcb->local_port;
   lpcb->state = LISTEN;
@@ -1083,15 +1101,27 @@ tcp_connect(struct tcp_pcb *pcb, const ip_addr_t *ipaddr, u16_t port,
 
   LWIP_ERROR("tcp_connect: can only connect from state CLOSED", pcb->state == CLOSED, return ERR_ISCONN);
 
+#ifdef LOSCFG_NET_CONTAINER
+  struct net_group *group = get_net_group_from_tcp_pcb(pcb);
+  LWIP_ERROR("tcp_connect: invalid net group", group != NULL, return ERR_RTE);
+#endif
   LWIP_DEBUGF(TCP_DEBUG, ("tcp_connect to port %"U16_F"\n", port));
   ip_addr_set(&pcb->remote_ip, ipaddr);
   pcb->remote_port = port;
 
   if (pcb->netif_idx != NETIF_NO_INDEX) {
+#ifdef LOSCFG_NET_CONTAINER
+    netif = netif_get_by_index(pcb->netif_idx, group);
+#else
     netif = netif_get_by_index(pcb->netif_idx);
+#endif
   } else {
     /* check if we have a route to the remote host */
+#ifdef LOSCFG_NET_CONTAINER
+    netif = ip_route(&pcb->local_ip, &pcb->remote_ip, group);
+#else
     netif = ip_route(&pcb->local_ip, &pcb->remote_ip);
+#endif
   }
   if (netif == NULL) {
     /* Don't even try to send a SYN packet if we have no route since that will fail. */

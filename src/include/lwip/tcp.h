@@ -408,6 +408,10 @@ err_t lwip_tcp_event(void *arg, struct tcp_pcb *pcb,
 #endif /* LWIP_EVENT_API */
 
 /* Application program's interface: */
+#ifdef LOSCFG_NET_CONTAINER
+void set_tcp_pcb_net_group(struct tcp_pcb *pcb, struct net_group *group);
+struct net_group *get_net_group_from_tcp_pcb(const struct tcp_pcb *pcb);
+#endif
 struct tcp_pcb * tcp_new     (void);
 struct tcp_pcb * tcp_new_ip_type (u8_t type);
 
