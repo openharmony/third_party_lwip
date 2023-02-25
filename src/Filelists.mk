@@ -49,7 +49,8 @@ COREFILES=$(LWIPDIR)/core/init.c \
 	$(LWIPDIR)/core/tcp_in.c \
 	$(LWIPDIR)/core/tcp_out.c \
 	$(LWIPDIR)/core/timeouts.c \
-	$(LWIPDIR)/core/udp.c
+	$(LWIPDIR)/core/udp.c \
+	$(LWIPDIR)/core/net_group.c
 
 CORE4FILES=$(LWIPDIR)/core/ipv4/acd.c \
 	$(LWIPDIR)/core/ipv4/autoip.c \

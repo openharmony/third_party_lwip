@@ -3790,7 +3790,11 @@ lwip_setsockopt_impl(int s, int level, int optname, const void *optval, socklen_
           LWIP_SOCKOPT_CHECK_OPTLEN_CONN_PCB_TYPE(sock, optlen, struct ipv6_mreq, NETCONN_UDP);
           inet6_addr_to_ip6addr(&multi_addr, &imr->ipv6mr_multiaddr);
           LWIP_ASSERT("Invalid netif index", imr->ipv6mr_interface <= 0xFFu);
+#ifdef LOSCFG_NET_CONTAINER
+          netif = netif_get_by_index((u8_t)imr->ipv6mr_interface, get_net_group_from_ippcb(sock->conn->pcb.ip));
+#else
           netif = netif_get_by_index((u8_t)imr->ipv6mr_interface);
+#endif
           if (netif == NULL) {
             err = EADDRNOTAVAIL;
             break;

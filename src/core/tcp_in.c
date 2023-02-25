@@ -119,6 +119,9 @@ tcp_input(struct pbuf *p, struct netif *inp)
 {
   struct tcp_pcb *pcb, *prev;
   struct tcp_pcb_listen *lpcb;
+#ifdef LOSCFG_NET_CONTAINER
+  struct net_group *group = get_net_group_from_netif(inp);
+#endif
 #if SO_REUSE
   struct tcp_pcb *lpcb_prev = NULL;
   struct tcp_pcb_listen *lpcb_any = NULL;
@@ -259,7 +262,12 @@ tcp_input(struct pbuf *p, struct netif *inp)
       continue;
     }
 
+#ifdef LOSCFG_NET_CONTAINER
+    if (group == get_net_group_from_tcp_pcb(pcb) &&
+        pcb->remote_port == tcphdr->src &&
+#else
     if (pcb->remote_port == tcphdr->src &&
+#endif
         pcb->local_port == tcphdr->dest &&
         ip_addr_eq(&pcb->remote_ip, ip_current_src_addr()) &&
         ip_addr_eq(&pcb->local_ip, ip_current_dest_addr())) {
@@ -292,7 +300,12 @@ tcp_input(struct pbuf *p, struct netif *inp)
         continue;
       }
 
+#ifdef LOSCFG_NET_CONTAINER
+      if (group == get_net_group_from_tcp_pcb(pcb) &&
+          pcb->remote_port == tcphdr->src &&
+#else
       if (pcb->remote_port == tcphdr->src &&
+#endif
           pcb->local_port == tcphdr->dest &&
           ip_addr_eq(&pcb->remote_ip, ip_current_src_addr()) &&
           ip_addr_eq(&pcb->local_ip, ip_current_dest_addr())) {
@@ -323,7 +336,11 @@ tcp_input(struct pbuf *p, struct netif *inp)
         continue;
       }
 
+#ifdef LOSCFG_NET_CONTAINER
+      if (group == get_net_group_from_tcp_pcb((struct tcp_pcb *)lpcb) && lpcb->local_port == tcphdr->dest) {
+#else
       if (lpcb->local_port == tcphdr->dest) {
+#endif
         if (IP_IS_ANY_TYPE_VAL(lpcb->local_ip)) {
           /* found an ANY TYPE (IPv4/IPv6) match */
 #if SO_REUSE
@@ -640,6 +657,9 @@ tcp_listen_input(struct tcp_pcb_listen *pcb)
 
   LWIP_ASSERT("tcp_listen_input: invalid pcb", pcb != NULL);
 
+#ifdef LOSCFG_NET_CONTAINER
+  struct net_group *group = get_net_group_from_tcp_pcb((struct tcp_pcb *)pcb);
+#endif
   /* In the LISTEN state, we check for incoming SYN segments,
      creates a new PCB, and responds with a SYN|ACK. */
   if (flags & TCP_ACK) {
@@ -668,6 +688,9 @@ tcp_listen_input(struct tcp_pcb_listen *pcb)
       LWIP_UNUSED_ARG(err); /* err not useful here */
       return;
     }
+#ifdef LOSCFG_NET_CONTAINER
+    set_tcp_pcb_net_group(npcb, group);
+#endif
 #if TCP_LISTEN_BACKLOG
     pcb->accepts_pending++;
     tcp_set_flags(npcb, TF_BACKLOGPEND);
@@ -706,7 +729,11 @@ tcp_listen_input(struct tcp_pcb_listen *pcb)
     npcb->snd_wnd_max = npcb->snd_wnd;
 
 #if TCP_CALCULATE_EFF_SEND_MSS
+#ifdef LOSCFG_NET_CONTAINER
+    npcb->mss = tcp_eff_send_mss(npcb->mss, &npcb->local_ip, &npcb->remote_ip, group);
+#else
     npcb->mss = tcp_eff_send_mss(npcb->mss, &npcb->local_ip, &npcb->remote_ip);
+#endif
 #endif /* TCP_CALCULATE_EFF_SEND_MSS */
 
     MIB2_STATS_INC(mib2.tcppassiveopens);
@@ -795,6 +822,9 @@ tcp_process(struct tcp_pcb *pcb)
   err_t err;
 
   err = ERR_OK;
+#ifdef LOSCFG_NET_CONTAINER
+  struct net_group *group = get_net_group_from_tcp_pcb(pcb);
+#endif
 
   LWIP_ASSERT("tcp_process: invalid pcb", pcb != NULL);
 
@@ -877,7 +907,11 @@ tcp_process(struct tcp_pcb *pcb)
         pcb->state = ESTABLISHED;
 
 #if TCP_CALCULATE_EFF_SEND_MSS
+#ifdef LOSCFG_NET_CONTAINER
+        pcb->mss = tcp_eff_send_mss(pcb->mss, &pcb->local_ip, &pcb->remote_ip, group);
+#else
         pcb->mss = tcp_eff_send_mss(pcb->mss, &pcb->local_ip, &pcb->remote_ip);
+#endif
 #endif /* TCP_CALCULATE_EFF_SEND_MSS */
 
         pcb->cwnd = LWIP_TCP_CALC_INITIAL_CWND(pcb->mss);

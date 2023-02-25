@@ -47,6 +47,9 @@
 #include "lwip/ip4.h"
 #include "lwip/ip6.h"
 #include "lwip/prot/ip.h"
+#ifdef LOSCFG_NET_CONTAINER
+#include "lwip/net_group.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -69,10 +72,33 @@ extern "C" {
 #define IP_PCB_NETIFHINT
 #endif /* LWIP_NETIF_USE_HINTS */
 
+#ifdef LOSCFG_NET_CONTAINER
+#ifndef IP_PCB_NETGROUP
+#define IP_PCB_NETGROUP
+#endif
+#endif
+
 /** This is the common part of all PCB types. It needs to be at the
    beginning of a PCB type definition. It is located here so that
    changes to this common part are made in one location instead of
    having to change all PCB structs. */
+#ifdef LOSCFG_NET_CONTAINER
+#define IP_PCB                             \
+  /* ip addresses in network byte order */ \
+  ip_addr_t local_ip;                      \
+  ip_addr_t remote_ip;                     \
+  /* Bound netif index */                  \
+  u8_t netif_idx;                          \
+  /* Socket options */                     \
+  u8_t so_options;                         \
+  /* Type Of Service */                    \
+  u8_t tos;                                \
+  /* Time To Live */                       \
+  u8_t ttl                                 \
+  /* link layer address resolution hint */ \
+  IP_PCB_NETIFHINT                         \
+  IP_PCB_NETGROUP
+#else
 #define IP_PCB                             \
   /* ip addresses in network byte order */ \
   ip_addr_t local_ip;                      \
@@ -87,6 +113,7 @@ extern "C" {
   u8_t ttl                                 \
   /* link layer address resolution hint */ \
   IP_PCB_NETIFHINT
+#endif
 
 struct ip_pcb {
   /* Common members of all PCB types */
@@ -270,10 +297,17 @@ extern struct ip_globals ip_data;
  * @ingroup ip
  * Get netif for address combination. See \ref ip6_route and \ref ip4_route
  */
+#ifdef LOSCFG_NET_CONTAINER
+#define ip_route(src, dest, group) \
+        (IP_IS_V6(dest) ? \
+        ip6_route(ip_2_ip6(src), ip_2_ip6(dest), group) : \
+        ip4_route_src(ip_2_ip4(src), ip_2_ip4(dest), group))
+#else
 #define ip_route(src, dest) \
         (IP_IS_V6(dest) ? \
         ip6_route(ip_2_ip6(src), ip_2_ip6(dest)) : \
         ip4_route_src(ip_2_ip4(src), ip_2_ip4(dest)))
+#endif
 /**
  * @ingroup ip
  * Get netif for IP.
@@ -332,6 +366,10 @@ err_t ip_input(struct pbuf *p, struct netif *inp);
   (ipaddr) = ip_netif_get_local_ip(netif, dest); \
 }while(0)
 
+#ifdef LOSCFG_NET_CONTAINER
+void set_ippcb_net_group(struct ip_pcb *pcb, struct net_group *group);
+struct net_group *get_net_group_from_ippcb(struct ip_pcb *pcb);
+#endif
 #ifdef __cplusplus
 }
 #endif

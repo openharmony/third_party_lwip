@@ -248,12 +248,20 @@ enum lwip_ipv6_scope_type
  * @param dest the IPv6 address for which to select and set a zone.
  * @param src source IPv6 address (const); may be equal to dest.
  */
+#ifdef LOSCFG_NET_CONTAINER
+#define ip6_addr_select_zone(dest, src) do { struct netif *selected_netif; \
+    selected_netif = ip6_route((src), (dest), get_root_net_group()); \
+    if (selected_netif != NULL) { \
+      ip6_addr_assign_zone((dest), IP6_UNKNOWN, selected_netif); \
+  } } while (0)
+#else
 #define ip6_addr_select_zone(dest, src) do { struct netif *selected_netif; \
   selected_netif = ip6_route((src), (dest)); \
   if (selected_netif != NULL) { \
     ip6_addr_assign_zone((dest), IP6_UNKNOWN, selected_netif); \
   } } while (0)
 
+#endif
 /**
  * @}
  */
