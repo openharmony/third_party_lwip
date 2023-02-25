@@ -1061,7 +1061,11 @@ nd6_tmr(void)
   }
 
   /* Process our own addresses, updating address lifetimes and/or DAD state. */
+#ifdef LOSCFG_NET_CONTAINER
+  NETIF_FOREACH(netif, get_root_net_group()) {
+#else
   NETIF_FOREACH(netif) {
+#endif
     for (i = 0; i < LWIP_IPV6_NUM_ADDRESSES; ++i) {
       u8_t addr_state;
 #if LWIP_IPV6_ADDRESS_LIFETIMES
@@ -1142,7 +1146,11 @@ nd6_tmr(void)
   /* Send router solicitation messages, if necessary. */
   if (!nd6_tmr_rs_reduction) {
     nd6_tmr_rs_reduction = (ND6_RTR_SOLICITATION_INTERVAL / ND6_TMR_INTERVAL) - 1;
+#ifdef LOSCFG_NET_CONTAINER
+    NETIF_FOREACH(netif, get_root_net_group()) {
+#else
     NETIF_FOREACH(netif) {
+#endif
       if ((netif->rs_count > 0) && netif_is_up(netif) &&
           netif_is_link_up(netif) &&
           !ip6_addr_isinvalid(netif_ip6_addr_state(netif, 0)) &&

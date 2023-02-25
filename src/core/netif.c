@@ -106,13 +106,17 @@
 static netif_ext_callback_t *ext_callback;
 #endif
 
+#ifndef LOSCFG_NET_CONTAINER
 #if !LWIP_SINGLE_NETIF
 struct netif *netif_list;
 #endif /* !LWIP_SINGLE_NETIF */
 struct netif *netif_default;
+#endif
 
 #define netif_index_to_num(index)   ((index) - 1)
+#ifndef LOSCFG_NET_CONTAINER
 static u8_t netif_num;
+#endif
 
 #if LWIP_NUM_NETIF_CLIENT_DATA > 0
 static u8_t netif_client_id;
@@ -138,7 +142,16 @@ static err_t netif_loop_output_ipv6(struct netif *netif, struct pbuf *p, const i
 #endif
 
 
+#ifdef LOSCFG_NET_CONTAINER
+struct net_group *get_net_group_from_netif(struct netif *netif) {
+  if (netif != NULL) {
+    return get_default_net_group_ops()->get_net_group_from_netif(netif);
+  }
+  return NULL;
+}
+#else
 static struct netif loop_netif;
+#endif
 
 /**
  * Initialize a lwip network interface structure for a loopback interface
@@ -174,7 +187,11 @@ netif_loopif_init(struct netif *netif)
 #endif /* LWIP_HAVE_LOOPIF */
 
 void
+#ifdef LOSCFG_NET_CONTAINER
+netif_init(struct net_group *group)
+#else
 netif_init(void)
+#endif
 {
 #if LWIP_HAVE_LOOPIF
 #if LWIP_IPV4
@@ -187,19 +204,41 @@ netif_init(void)
 #define LOOPIF_ADDRINIT
 #endif /* LWIP_IPV4 */
 
+#ifdef LOSCFG_NET_CONTAINER
+struct netif *loop_netif = group->loop_netif;
+#endif
+
 #if NO_SYS
+#ifdef LOSCFG_NET_CONTAINER
+  netif_add(loop_netif, group, LOOPIF_ADDRINIT NULL, netif_loopif_init, ip_input);
+#else
   netif_add(&loop_netif, LOOPIF_ADDRINIT NULL, netif_loopif_init, ip_input);
+#endif
 #else  /* NO_SYS */
+#ifdef LOSCFG_NET_CONTAINER
+  netif_add(loop_netif, group, LOOPIF_ADDRINIT NULL, netif_loopif_init, tcpip_input);
+#else
   netif_add(&loop_netif, LOOPIF_ADDRINIT NULL, netif_loopif_init, tcpip_input);
+#endif
 #endif /* NO_SYS */
 
 #if LWIP_IPV6
+#ifdef LOSCFG_NET_CONTAINER
+  IP_ADDR6_HOST(loop_netif->ip6_addr, 0, 0, 0, 0x00000001UL);
+  loop_netif->ip6_addr_state[0] = IP6_ADDR_VALID;
+#else
   IP_ADDR6_HOST(loop_netif.ip6_addr, 0, 0, 0, 0x00000001UL);
   loop_netif.ip6_addr_state[0] = IP6_ADDR_VALID;
+#endif
 #endif /* LWIP_IPV6 */
 
+#ifdef LOSCFG_NET_CONTAINER
+  netif_set_link_up(loop_netif);
+  netif_set_up(loop_netif);
+#else
   netif_set_link_up(&loop_netif);
   netif_set_up(&loop_netif);
+#endif
 
 #endif /* LWIP_HAVE_LOOPIF */
 }
@@ -236,9 +275,17 @@ netif_input(struct pbuf *p, struct netif *inp)
  * Same as @ref netif_add but without IPv4 addresses
  */
 struct netif *
+#ifdef LOSCFG_NET_CONTAINER
+netif_add_noaddr(struct netif *netif, struct net_group *group, void *state, netif_init_fn init, netif_input_fn input)
+#else
 netif_add_noaddr(struct netif *netif, void *state, netif_init_fn init, netif_input_fn input)
+#endif
 {
+#ifdef LOSCFG_NET_CONTAINER
+  return netif_add(netif, group,
+#else
   return netif_add(netif,
+#endif
 #if LWIP_IPV4
                    NULL, NULL, NULL,
 #endif /* LWIP_IPV4*/
@@ -273,7 +320,11 @@ netif_add_noaddr(struct netif *netif, void *state, netif_init_fn init, netif_inp
  * @return netif, or NULL if failed.
  */
 struct netif *
+#ifdef LOSCFG_NET_CONTAINER
+netif_add(struct netif *netif, struct net_group *group,
+#else
 netif_add(struct netif *netif,
+#endif
 #if LWIP_IPV4
           const ip4_addr_t *ipaddr, const ip4_addr_t *netmask, const ip4_addr_t *gw,
 #endif /* LWIP_IPV4 */
@@ -285,8 +336,16 @@ netif_add(struct netif *netif,
 
   LWIP_ASSERT_CORE_LOCKED();
 
+#ifdef LOSCFG_NET_CONTAINER
+  get_default_net_group_ops()->set_netif_net_group(netif, group);
+#endif
+
 #if LWIP_SINGLE_NETIF
+#ifdef LOSCFG_NET_CONTAINER
+  if (group->loop_netif != NULL) {
+#else
   if (netif_default != NULL) {
+#endif
     LWIP_ASSERT("single netif already set", 0);
     return NULL;
   }
@@ -351,7 +410,11 @@ netif_add(struct netif *netif,
 
   /* remember netif specific state information data */
   netif->state = state;
+#ifdef LOSCFG_NET_CONTAINER
+  netif->num = group->netif_num;
+#else
   netif->num = netif_num;
+#endif
   netif->input = input;
 
   NETIF_RESET_HINTS(netif);
@@ -394,7 +457,11 @@ netif_add(struct netif *netif,
         netif->num = 0;
       }
       num_netifs = 0;
+#ifdef LOSCFG_NET_CONTAINER
+      for (netif2 = group->netif_list; netif2 != NULL; netif2 = netif2->next) {
+#else
       for (netif2 = netif_list; netif2 != NULL; netif2 = netif2->next) {
+#endif
         LWIP_ASSERT("netif already added", netif2 != netif);
         num_netifs++;
         LWIP_ASSERT("too many netifs, max. supported number is 255", num_netifs <= 255);
@@ -406,14 +473,27 @@ netif_add(struct netif *netif,
     } while (netif2 != NULL);
   }
   if (netif->num == 254) {
+#ifdef LOSCFG_NET_CONTAINER
+    group->netif_num = 0;
+#else
     netif_num = 0;
+#endif
   } else {
+#ifdef LOSCFG_NET_CONTAINER
+    group->netif_num = (u8_t)(netif->num + 1);
+#else
     netif_num = (u8_t)(netif->num + 1);
+#endif
   }
 
   /* add this netif to the list */
+#ifdef LOSCFG_NET_CONTAINER
+  netif->next = group->netif_list;
+  group->netif_list = netif;
+#else
   netif->next = netif_list;
   netif_list = netif;
+#endif
 #endif /* "LWIP_SINGLE_NETIF */
   mib2_netif_added(netif);
 
@@ -748,7 +828,13 @@ netif_remove(struct netif *netif)
   if (netif == NULL) {
     return;
   }
+#ifdef LOSCFG_NET_CONTAINER
+  struct net_group *group = get_net_group_from_netif(netif);
 
+  if (group == NULL) {
+    return;
+  }
+#endif
   netif_invoke_ext_callback(netif, LWIP_NSC_NETIF_REMOVED, NULL);
 
 #if LWIP_IPV4
@@ -783,18 +869,35 @@ netif_remove(struct netif *netif)
   mib2_remove_ip4(netif);
 
   /* this netif is default? */
+#ifdef LOSCFG_NET_CONTAINER
+  if (group->netif_default == netif) {
+#else
   if (netif_default == netif) {
+#endif
     /* reset default netif */
+#ifdef LOSCFG_NET_CONTAINER
+    netif_set_default(NULL, group);
+#else
     netif_set_default(NULL);
+#endif
   }
 #if !LWIP_SINGLE_NETIF
   /*  is it the first netif? */
+#ifdef LOSCFG_NET_CONTAINER
+  if (group->netif_list == netif) {
+    group->netif_list = netif->next;
+#else
   if (netif_list == netif) {
     netif_list = netif->next;
+#endif
   } else {
     /*  look for netif further down the list */
     struct netif *tmp_netif;
+#ifdef LOSCFG_NET_CONTAINER
+    NETIF_FOREACH(tmp_netif, group) {
+#else
     NETIF_FOREACH(tmp_netif) {
+#endif
       if (tmp_netif->next == netif) {
         tmp_netif->next = netif->next;
         break;
@@ -822,7 +925,11 @@ netif_remove(struct netif *netif)
  * @param netif the default network interface
  */
 void
+#ifdef LOSCFG_NET_CONTAINER
+netif_set_default(struct netif *netif, struct net_group *group)
+#else
 netif_set_default(struct netif *netif)
+#endif
 {
   LWIP_ASSERT_CORE_LOCKED();
 
@@ -833,11 +940,22 @@ netif_set_default(struct netif *netif)
     /* install default route */
     mib2_add_route_ip4(1, netif);
   }
+#ifdef LOSCFG_NET_CONTAINER
+  group->netif_default = netif;
+#else
   netif_default = netif;
+#endif
   LWIP_DEBUGF(NETIF_DEBUG, ("netif: setting default interface %c%c\n",
                             netif ? netif->name[0] : '\'', netif ? netif->name[1] : '\''));
 }
 
+#ifdef LOSCFG_NET_CONTAINER
+void
+netif_set_default2(struct netif *netif)
+{
+    netif_set_default(netif, get_curr_process_net_group());
+}
+#endif
 /**
  * @ingroup netif
  * Bring an interface up, available for processing
@@ -1094,7 +1212,11 @@ netif_loop_output(struct netif *netif, struct pbuf *p)
    * if not they are adjusted for 'netif'. */
 #if MIB2_STATS
 #if LWIP_HAVE_LOOPIF
+#ifdef LOSCFG_NET_CONTAINER
+  struct netif *stats_if = get_net_group_from_netif(netif)->loop_netif;
+#else
   struct netif *stats_if = &loop_netif;
+#endif
 #else /* LWIP_HAVE_LOOPIF */
   struct netif *stats_if = netif;
 #endif /* LWIP_HAVE_LOOPIF */
@@ -1219,7 +1341,11 @@ netif_poll(struct netif *netif)
    * if not they are adjusted for 'netif'. */
 #if MIB2_STATS
 #if LWIP_HAVE_LOOPIF
+#ifdef LOSCFG_NET_CONTAINER
+  struct netif *stats_if = get_net_group_from_netif(netif)->loop_netif;
+#else
   struct netif *stats_if = &loop_netif;
+#endif
 #else /* LWIP_HAVE_LOOPIF */
   struct netif *stats_if = netif;
 #endif /* LWIP_HAVE_LOOPIF */
@@ -1671,9 +1797,17 @@ netif_name_to_index(const char *name)
 * @param name char buffer of at least NETIF_NAMESIZE bytes
 */
 char *
+#ifdef LOSCFG_NET_CONTAINER
+netif_index_to_name(u8_t idx, char *name, struct net_group *group)
+#else
 netif_index_to_name(u8_t idx, char *name)
+#endif
 {
+#ifdef LOSCFG_NET_CONTAINER
+  struct netif *netif = netif_get_by_index(idx, group);
+#else
   struct netif *netif = netif_get_by_index(idx);
+#endif
 
   if (netif != NULL) {
     name[0] = netif->name[0];
@@ -1691,14 +1825,23 @@ netif_index_to_name(u8_t idx, char *name)
 * @param idx index of netif to find
 */
 struct netif *
+#ifdef LOSCFG_NET_CONTAINER
+netif_get_by_index(u8_t idx, struct net_group *group)
+#else
 netif_get_by_index(u8_t idx)
+#endif
 {
   struct netif *netif;
 
   LWIP_ASSERT_CORE_LOCKED();
 
+#ifdef LOSCFG_NET_CONTAINER
+  if (idx != NETIF_NO_INDEX && group != NULL) {
+    NETIF_FOREACH(netif, group) {
+#else
   if (idx != NETIF_NO_INDEX) {
     NETIF_FOREACH(netif) {
+#endif
       if (idx == netif_get_index(netif)) {
         return netif; /* found! */
       }

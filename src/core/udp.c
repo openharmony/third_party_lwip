@@ -80,6 +80,17 @@ static u16_t udp_port = UDP_LOCAL_PORT_RANGE_START;
 /* exported in udp.h (was static) */
 struct udp_pcb *udp_pcbs;
 
+#ifdef LOSCFG_NET_CONTAINER
+void set_udp_pcb_net_group(struct udp_pcb *pcb, struct net_group *group)
+{
+  set_ippcb_net_group((struct ip_pcb *)pcb, group);
+}
+
+struct net_group *get_net_group_from_udp_pcb(struct udp_pcb *pcb)
+{
+  return get_net_group_from_ippcb((struct ip_pcb *)pcb);
+}
+#endif
 /**
  * Initialize this module.
  */
@@ -196,6 +207,9 @@ udp_input(struct pbuf *p, struct netif *inp)
   struct udp_hdr *udphdr;
   struct udp_pcb *pcb, *prev;
   struct udp_pcb *uncon_pcb;
+#ifdef LOSCFG_NET_CONTAINER
+  struct net_group *inp_net_group = get_net_group_from_netif(inp);
+#endif
   u16_t src, dest;
   u8_t broadcast;
   u8_t for_us = 0;
@@ -259,7 +273,11 @@ udp_input(struct pbuf *p, struct netif *inp)
     LWIP_DEBUGF(UDP_DEBUG, (", %"U16_F")\n", pcb->remote_port));
 
     /* compare PCB local addr+port to UDP destination addr+port */
+#ifdef LOSCFG_NET_CONTAINER
+    if (inp_net_group == get_net_group_from_udp_pcb(pcb) && (pcb->local_port == dest) &&
+#else
     if ((pcb->local_port == dest) &&
+#endif
         (udp_input_local_match(pcb, inp, broadcast) != 0)) {
       if ((pcb->flags & UDP_FLAGS_CONNECTED) == 0) {
         if (uncon_pcb == NULL) {
@@ -381,7 +399,11 @@ udp_input(struct pbuf *p, struct netif *inp)
            if SOF_REUSEADDR is set on the first match */
         struct udp_pcb *mpcb;
         for (mpcb = udp_pcbs; mpcb != NULL; mpcb = mpcb->next) {
+#ifdef LOSCFG_NET_CONTAINER
+          if (mpcb != pcb && inp_net_group == get_net_group_from_udp_pcb(mpcb)) {
+#else
           if (mpcb != pcb) {
+#endif
             /* compare PCB local addr+port to UDP destination addr+port */
             if ((mpcb->local_port == dest) &&
                 (udp_input_local_match(mpcb, inp, broadcast) != 0)) {
@@ -547,8 +569,16 @@ udp_sendto_chksum(struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *dst_ip,
 
   LWIP_DEBUGF(UDP_DEBUG | LWIP_DBG_TRACE, ("udp_send\n"));
 
+#ifdef LOSCFG_NET_CONTAINER
+  struct net_group *group = get_net_group_from_udp_pcb(pcb);
+  LWIP_ERROR("udp_sendto: invalid net group", group != NULL, return ERR_VAL);
+#endif
   if (pcb->netif_idx != NETIF_NO_INDEX) {
+#ifdef LOSCFG_NET_CONTAINER
+    netif = netif_get_by_index(pcb->netif_idx, group);
+#else
     netif = netif_get_by_index(pcb->netif_idx);
+#endif
   } else {
 #if LWIP_MULTICAST_TX_OPTIONS
     netif = NULL;
@@ -560,7 +590,11 @@ udp_sendto_chksum(struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *dst_ip,
        * list, but by doing so we skip a route lookup. If the interface index has
        * gone stale, we fall through and do the regular route lookup after all. */
       if (pcb->mcast_ifindex != NETIF_NO_INDEX) {
+#ifdef LOSCFG_NET_CONTAINER
+        netif = netif_get_by_index(pcb->mcast_ifindex, group);
+#else
         netif = netif_get_by_index(pcb->mcast_ifindex);
+#endif
       }
 #if LWIP_IPV4
       else
@@ -575,7 +609,11 @@ udp_sendto_chksum(struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *dst_ip,
              fails, we try regular routing as though no override was set. */
           if (!ip4_addr_isany_val(pcb->mcast_ip4) &&
               !ip4_addr_cmp(&pcb->mcast_ip4, IP4_ADDR_BROADCAST)) {
+#ifdef LOSCFG_NET_CONTAINER
+            netif = ip4_route_src(ip_2_ip4(&pcb->local_ip), &pcb->mcast_ip4, group);
+#else
             netif = ip4_route_src(ip_2_ip4(&pcb->local_ip), &pcb->mcast_ip4);
+#endif
           }
         }
 #endif /* LWIP_IPV4 */
@@ -585,7 +623,11 @@ udp_sendto_chksum(struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *dst_ip,
 #endif /* LWIP_MULTICAST_TX_OPTIONS */
     {
       /* find the outgoing network interface for this packet */
+#ifdef LOSCFG_NET_CONTAINER
+      netif = ip_route(&pcb->local_ip, dst_ip, group);
+#else
       netif = ip_route(&pcb->local_ip, dst_ip);
+#endif
     }
   }
 
@@ -990,7 +1032,11 @@ udp_bind(struct udp_pcb *pcb, const ip_addr_t *ipaddr, u16_t port)
     }
   } else {
     for (ipcb = udp_pcbs; ipcb != NULL; ipcb = ipcb->next) {
+#ifdef LOSCFG_NET_CONTAINER
+      if (pcb != ipcb && (get_net_group_from_udp_pcb(pcb) == get_net_group_from_udp_pcb(ipcb))) {
+#else
       if (pcb != ipcb) {
+#endif
         /* By default, we don't allow to bind to a port that any other udp
            PCB is already bound to, unless *all* PCBs with that port have tha
            REUSEADDR flag set. */

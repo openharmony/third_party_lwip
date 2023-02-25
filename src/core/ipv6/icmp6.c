@@ -360,7 +360,11 @@ icmp6_send_response_with_addrs(struct pbuf *p, u8_t code, u32_t data, u8_t type,
   /* Swap source and destination for the reply. */
   reply_dest = src_addr;
   reply_src = dest_addr;
+#ifdef LOSCFG_NET_CONTAINER
+  netif = ip6_route(reply_src, reply_dest, get_root_net_group());
+#else
   netif = ip6_route(reply_src, reply_dest);
+#endif
   if (netif == NULL) {
     ICMP6_STATS_INC(icmp6.rterr);
     return;

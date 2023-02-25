@@ -52,6 +52,7 @@ COREFILES = [
   "$LWIPDIR/core/tcp_out.c",
   "$LWIPDIR/core/timeouts.c",
   "$LWIPDIR/core/udp.c",
+  "$LWIPDIR/core/net_group.c",
 ]
 
 CORE4FILES = [

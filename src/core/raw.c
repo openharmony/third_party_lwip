@@ -135,6 +135,9 @@ raw_input_state_t
 raw_input(struct pbuf *p, struct netif *inp)
 {
   struct raw_pcb *pcb, *prev;
+#ifdef LOSCFG_NET_CONTAINER
+  struct net_group *inp_net_group = get_net_group_from_netif(inp);
+#endif
   s16_t proto;
   raw_input_state_t ret = RAW_INPUT_NONE;
   u8_t broadcast = ip_addr_isbroadcast(ip_current_dest_addr(), ip_current_netif());
@@ -164,7 +167,12 @@ raw_input(struct pbuf *p, struct netif *inp)
   /* loop through all raw pcbs until the packet is eaten by one */
   /* this allows multiple pcbs to match against the packet by design */
   while (pcb != NULL) {
+#ifdef LOSCFG_NET_CONTAINER
+    if (inp_net_group == get_net_group_from_raw_pcb(pcb) &&
+        (pcb->protocol == proto) && raw_input_local_match(pcb, broadcast) &&
+#else
     if ((pcb->protocol == proto) && raw_input_local_match(pcb, broadcast) &&
+#endif
         (((pcb->flags & RAW_FLAGS_CONNECTED) == 0) ||
          ip_addr_cmp(&pcb->remote_ip, ip_current_src_addr()))) {
       /* receive callback function available? */
@@ -362,8 +370,15 @@ raw_sendto(struct raw_pcb *pcb, struct pbuf *p, const ip_addr_t *ipaddr)
 
   LWIP_DEBUGF(RAW_DEBUG | LWIP_DBG_TRACE, ("raw_sendto\n"));
 
+#ifdef LOSCFG_NET_CONTAINER
+  struct net_group *group = get_net_group_from_raw_pcb(pcb);
+#endif
   if (pcb->netif_idx != NETIF_NO_INDEX) {
+#ifdef LOSCFG_NET_CONTAINER
+    netif = netif_get_by_index(pcb->netif_idx, group);
+#else
     netif = netif_get_by_index(pcb->netif_idx);
+#endif
   } else {
 #if LWIP_MULTICAST_TX_OPTIONS
     netif = NULL;
@@ -371,13 +386,21 @@ raw_sendto(struct raw_pcb *pcb, struct pbuf *p, const ip_addr_t *ipaddr)
       /* For multicast-destined packets, use the user-provided interface index to
        * determine the outgoing interface, if an interface index is set and a
        * matching netif can be found. Otherwise, fall back to regular routing. */
+#ifdef LOSCFG_NET_CONTAINER
+      netif = netif_get_by_index(pcb->mcast_ifindex, group);
+#else
       netif = netif_get_by_index(pcb->mcast_ifindex);
+#endif
     }
 
     if (netif == NULL)
 #endif /* LWIP_MULTICAST_TX_OPTIONS */
     {
+#ifdef LOSCFG_NET_CONTAINER
+      netif = ip_route(&pcb->local_ip, ipaddr, group);
+#else
       netif = ip_route(&pcb->local_ip, ipaddr);
+#endif
     }
   }
 
@@ -580,6 +603,16 @@ raw_remove(struct raw_pcb *pcb)
   memp_free(MEMP_RAW_PCB, pcb);
 }
 
+#ifdef LOSCFG_NET_CONTAINER
+void set_raw_pcb_net_group(struct raw_pcb *pcb, struct net_group *group)
+{
+  set_ippcb_net_group((struct ip_pcb *)pcb, group);
+}
+
+struct net_group *get_net_group_from_raw_pcb(struct raw_pcb *pcb) {
+  return get_net_group_from_ippcb((struct ip_pcb *)pcb);
+}
+#endif
 /**
  * @ingroup raw_raw
  * Create a RAW PCB.
