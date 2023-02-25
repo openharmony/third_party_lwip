@@ -508,8 +508,11 @@ etharp_add_static_entry(const ip4_addr_t *ipaddr, struct eth_addr *ethaddr)
               ip4_addr1_16(ipaddr), ip4_addr2_16(ipaddr), ip4_addr3_16(ipaddr), ip4_addr4_16(ipaddr),
               (u16_t)ethaddr->addr[0], (u16_t)ethaddr->addr[1], (u16_t)ethaddr->addr[2],
               (u16_t)ethaddr->addr[3], (u16_t)ethaddr->addr[4], (u16_t)ethaddr->addr[5]));
-
+#ifdef LOSCFG_NET_CONTAINER
+  netif = ip4_route(ipaddr, get_root_net_group());
+#else
   netif = ip4_route(ipaddr);
+#endif
   if (netif == NULL) {
     return ERR_RTE;
   }
