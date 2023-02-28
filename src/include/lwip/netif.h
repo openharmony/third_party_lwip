@@ -48,6 +48,9 @@
 #include "lwip/def.h"
 #include "lwip/pbuf.h"
 #include "lwip/stats.h"
+#ifdef LOSCFG_NET_CONTAINER
+#include "lwip/net_group.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -403,21 +406,46 @@ struct netif {
 #endif /* LWIP_CHECKSUM_CTRL_PER_NETIF */
 
 #if LWIP_SINGLE_NETIF
+#ifdef LOSCFG_NET_CONTAINER
+#define NETIF_FOREACH(netif, group) if (((netif) = group->netif_default) != NULL)
+#else
 #define NETIF_FOREACH(netif) if (((netif) = netif_default) != NULL)
+#endif
 #else /* LWIP_SINGLE_NETIF */
+#ifdef LOSCFG_NET_CONTAINER
+#define NETIF_FOREACH(netif, group) for ((netif) = group->netif_list; (netif) != NULL; (netif) = (netif)->next)
+#else
 /** The list of network interfaces. */
 extern struct netif *netif_list;
 #define NETIF_FOREACH(netif) for ((netif) = netif_list; (netif) != NULL; (netif) = (netif)->next)
+#endif
+
 #endif /* LWIP_SINGLE_NETIF */
+#ifndef LOSCFG_NET_CONTAINER
 /** The default network interface. */
 extern struct netif *netif_default;
+#endif
 
+#ifdef LOSCFG_NET_CONTAINER
+struct net_group *get_net_group_from_netif(struct netif *netif);
+void netif_init(struct net_group *group);
+#else
 void netif_init(void);
+#endif
 
+#ifdef LOSCFG_NET_CONTAINER
+struct netif *netif_add_noaddr(struct netif *netif, struct net_group *group,
+                                    void *state, netif_init_fn init, netif_input_fn input);
+#else
 struct netif *netif_add_noaddr(struct netif *netif, void *state, netif_init_fn init, netif_input_fn input);
+#endif
 
 #if LWIP_IPV4
+#ifdef LOSCFG_NET_CONTAINER
+struct netif *netif_add(struct netif *netif, struct net_group *group,
+#else
 struct netif *netif_add(struct netif *netif,
+#endif
                             const ip4_addr_t *ipaddr, const ip4_addr_t *netmask, const ip4_addr_t *gw,
                             void *state, netif_init_fn init, netif_input_fn input);
 void netif_set_addr(struct netif *netif, const ip4_addr_t *ipaddr, const ip4_addr_t *netmask,
@@ -433,7 +461,12 @@ void netif_remove(struct netif * netif);
    structure. */
 struct netif *netif_find(const char *name);
 
+#ifdef LOSCFG_NET_CONTAINER
+void netif_set_default(struct netif *netif, struct net_group *group);
+void netif_set_default2(struct netif *netif);
+#else
 void netif_set_default(struct netif *netif);
+#endif
 
 #if LWIP_IPV4
 void netif_set_ipaddr(struct netif *netif, const ip4_addr_t *ipaddr);
@@ -553,8 +586,13 @@ err_t netif_add_ip6_address(struct netif *netif, const ip6_addr_t *ip6addr, s8_t
 #endif /* LWIP_NETIF_USE_HINTS */
 
 u8_t netif_name_to_index(const char *name);
+#ifdef LOSCFG_NET_CONTAINER
+char * netif_index_to_name(u8_t idx, char *name, struct net_group *group);
+struct netif* netif_get_by_index(u8_t idx, struct net_group *group);
+#else
 char * netif_index_to_name(u8_t idx, char *name);
 struct netif* netif_get_by_index(u8_t idx);
+#endif
 
 /* Interface indexes always start at 1 per RFC 3493, section 4, num starts at 0 (internal index is 0..254)*/
 #define netif_get_index(netif)      ((u8_t)((netif)->num + 1))
