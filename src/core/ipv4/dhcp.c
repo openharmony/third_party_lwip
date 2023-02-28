@@ -438,7 +438,11 @@ dhcp_coarse_tmr(void)
   struct netif *netif;
   LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_coarse_tmr()\n"));
   /* iterate through all network interfaces */
+#ifdef LOSCFG_NET_CONTAINER
+  NETIF_FOREACH(netif, get_root_net_group()) {
+#else
   NETIF_FOREACH(netif) {
+#endif
     /* only act on DHCP configured interfaces */
     struct dhcp *dhcp = netif_dhcp_data(netif);
     if ((dhcp != NULL) && (dhcp->state != DHCP_STATE_OFF)) {
@@ -475,7 +479,11 @@ dhcp_fine_tmr(void)
 {
   struct netif *netif;
   /* loop through netif's */
+#ifdef LOSCFG_NET_CONTAINER
+  NETIF_FOREACH(netif, get_root_net_group()) {
+#else
   NETIF_FOREACH(netif) {
+#endif
     struct dhcp *dhcp = netif_dhcp_data(netif);
     /* only act on DHCP configured interfaces */
     if (dhcp != NULL) {

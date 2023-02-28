@@ -800,7 +800,11 @@ dhcp6_tmr(void)
 {
   struct netif *netif;
   /* loop through netif's */
+#ifdef LOSCFG_NET_CONTAINER
+  NETIF_FOREACH(netif, get_root_net_group()) {
+#else
   NETIF_FOREACH(netif) {
+#endif
     struct dhcp6 *dhcp6 = netif_dhcp6_data(netif);
     /* only act on DHCPv6 configured interfaces */
     if (dhcp6 != NULL) {

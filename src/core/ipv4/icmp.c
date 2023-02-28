@@ -388,10 +388,18 @@ icmp_send_response(struct pbuf *p, u8_t type, u8_t code)
   {
     ip4_addr_t iphdr_dst;
     ip4_addr_copy(iphdr_dst, iphdr->dest);
+#ifdef LOSCFG_NET_CONTAINER
+    netif = ip4_route_src(&iphdr_dst, &iphdr_src, get_root_net_group());
+#else
     netif = ip4_route_src(&iphdr_dst, &iphdr_src);
+#endif
   }
 #else
+#ifdef LOSCFG_NET_CONTAINER
+  netif = ip4_route(&iphdr_src, get_root_net_group());
+#else
   netif = ip4_route(&iphdr_src);
+#endif
 #endif
   if (netif != NULL) {
     /* calculate checksum */

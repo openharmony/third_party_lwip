@@ -606,7 +606,11 @@ accept_function(void *arg, struct tcp_pcb *newpcb, err_t err)
  * @param msg the api_msg describing the connection type
  */
 static void
+#ifdef LOSCFG_NET_CONTAINER
+pcb_new(struct api_msg *msg, struct net_group *group)
+#else
 pcb_new(struct api_msg *msg)
+#endif
 {
   enum lwip_ip_addr_type iptype = IPADDR_TYPE_V4;
 
@@ -625,6 +629,9 @@ pcb_new(struct api_msg *msg)
     case NETCONN_RAW:
       msg->conn->pcb.raw = raw_new_ip_type(iptype, msg->msg.n.proto);
       if (msg->conn->pcb.raw != NULL) {
+#ifdef LOSCFG_NET_CONTAINER
+        set_raw_pcb_net_group(msg->conn->pcb.raw, group);
+#endif
 #if LWIP_IPV6
         /* ICMPv6 packets should always have checksum calculated by the stack as per RFC 3542 chapter 3.1 */
         if (NETCONNTYPE_ISIPV6(msg->conn->type) && msg->conn->pcb.raw->protocol == IP6_NEXTH_ICMP6) {
@@ -640,6 +647,9 @@ pcb_new(struct api_msg *msg)
     case NETCONN_UDP:
       msg->conn->pcb.udp = udp_new_ip_type(iptype);
       if (msg->conn->pcb.udp != NULL) {
+#ifdef LOSCFG_NET_CONTAINER
+        set_udp_pcb_net_group(msg->conn->pcb.udp, group);
+#endif
 #if LWIP_UDPLITE
         if (NETCONNTYPE_ISUDPLITE(msg->conn->type)) {
           udp_setflags(msg->conn->pcb.udp, UDP_FLAGS_UDPLITE);
@@ -656,6 +666,9 @@ pcb_new(struct api_msg *msg)
     case NETCONN_TCP:
       msg->conn->pcb.tcp = tcp_new_ip_type(iptype);
       if (msg->conn->pcb.tcp != NULL) {
+#ifdef LOSCFG_NET_CONTAINER
+        set_tcp_pcb_net_group(msg->conn->pcb.tcp, group);
+#endif
         setup_tcp(msg->conn);
       }
       break;
@@ -683,7 +696,11 @@ lwip_netconn_do_newconn(void *m)
 
   msg->err = ERR_OK;
   if (msg->conn->pcb.tcp == NULL) {
+#ifdef LOSCFG_NET_CONTAINER
+    pcb_new(msg, get_curr_process_net_group());
+#else
     pcb_new(msg);
+#endif
   }
   /* Else? This "new" connection already has a PCB allocated. */
   /* Is this an error condition? Should it be deleted? */
@@ -1248,6 +1265,7 @@ lwip_netconn_do_bind(void *m)
   msg->err = err;
   TCPIP_APIMSG_ACK(msg);
 }
+
 /**
  * Bind a pcb contained in a netconn to an interface
  * Called from netconn_bind_if.
@@ -1261,8 +1279,17 @@ lwip_netconn_do_bind_if(void *m)
   struct netif *netif;
   struct api_msg *msg = (struct api_msg *)m;
   err_t err;
+#ifdef LOSCFG_NET_CONTAINER
+  struct net_group *group = get_net_group_from_ippcb(msg->conn->pcb.ip);
 
+  if (group != NULL) {
+    netif = netif_get_by_index(msg->msg.bc.if_idx, group);
+  } else {
+    netif = NULL;
+  }
+#else
   netif = netif_get_by_index(msg->msg.bc.if_idx);
+#endif
 
   if ((netif != NULL) && (msg->conn->pcb.tcp != NULL)) {
     err = ERR_OK;
@@ -2064,8 +2091,18 @@ lwip_netconn_do_join_leave_group_netif(void *m)
 {
   struct api_msg *msg = (struct api_msg *)m;
   struct netif *netif;
+#ifdef LOSCFG_NET_CONTAINER
+  struct net_group *group = get_net_group_from_ippcb(msg->conn->pcb.ip);
 
+  if (group != NULL) {
+    netif = netif_get_by_index(msg->msg.jl.if_idx, group);
+  } else {
+    netif = NULL;
+  }
+#else
   netif = netif_get_by_index(msg->msg.jl.if_idx);
+#endif
+
   if (netif == NULL) {
     msg->err = ERR_IF;
     goto done;

@@ -478,8 +478,13 @@ void  tcp_trigger_input_pcb_close(void);
 #if TCP_CALCULATE_EFF_SEND_MSS
 u16_t tcp_eff_send_mss_netif(u16_t sendmss, struct netif *outif,
                              const ip_addr_t *dest);
+#ifdef LOSCFG_NET_CONTAINER
+#define tcp_eff_send_mss(sendmss, src, dest, group) \
+    tcp_eff_send_mss_netif(sendmss, ip_route(src, dest, group), dest)
+#else
 #define tcp_eff_send_mss(sendmss, src, dest) \
     tcp_eff_send_mss_netif(sendmss, ip_route(src, dest), dest)
+#endif
 #endif /* TCP_CALCULATE_EFF_SEND_MSS */
 
 #if LWIP_CALLBACK_API

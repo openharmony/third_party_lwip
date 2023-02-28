@@ -126,7 +126,11 @@ ip4_set_default_multicast_netif(struct netif *default_multicast_netif)
  * LWIP_HOOK_IP4_ROUTE_SRC(). This function only provides the parameters.
  */
 struct netif *
+#ifdef LOSCFG_NET_CONTAINER
+ip4_route_src(const ip4_addr_t *src, const ip4_addr_t *dest, struct net_group *group)
+#else
 ip4_route_src(const ip4_addr_t *src, const ip4_addr_t *dest)
+#endif
 {
   if (src != NULL) {
     /* when src==NULL, the hook is called from ip4_route(dest) */
@@ -135,7 +139,11 @@ ip4_route_src(const ip4_addr_t *src, const ip4_addr_t *dest)
       return netif;
     }
   }
+#ifdef LOSCFG_NET_CONTAINER
+  return ip4_route(dest, group);
+#else
   return ip4_route(dest);
+#endif
 }
 #endif /* LWIP_HOOK_IP4_ROUTE_SRC */
 
@@ -149,7 +157,11 @@ ip4_route_src(const ip4_addr_t *src, const ip4_addr_t *dest)
  * @return the netif on which to send to reach dest
  */
 struct netif *
+#ifdef LOSCFG_NET_CONTAINER
+ip4_route(const ip4_addr_t *dest, struct net_group *group)
+#else
 ip4_route(const ip4_addr_t *dest)
+#endif
 {
 #if !LWIP_SINGLE_NETIF
   struct netif *netif;
@@ -167,7 +179,11 @@ ip4_route(const ip4_addr_t *dest)
   LWIP_UNUSED_ARG(dest);
 
   /* iterate through netifs */
+#ifdef LOSCFG_NET_CONTAINER
+  NETIF_FOREACH(netif, group) {
+#else
   NETIF_FOREACH(netif) {
+#endif
     /* is the netif up, does it have a link and a valid address? */
     if (netif_is_up(netif) && netif_is_link_up(netif) && !ip4_addr_isany_val(*netif_ip4_addr(netif))) {
       /* network mask matches? */
@@ -187,11 +203,20 @@ ip4_route(const ip4_addr_t *dest)
   /* loopif is disabled, looopback traffic is passed through any netif */
   if (ip4_addr_isloopback(dest)) {
     /* don't check for link on loopback traffic */
+#ifdef LOSCFG_NET_CONTAINER
+    if (group->netif_default != NULL && netif_is_up(group->netif_default)) {
+      return group->netif_default;
+#else
     if (netif_default != NULL && netif_is_up(netif_default)) {
       return netif_default;
+#endif
     }
     /* default netif is not up, just use any netif for loopback traffic */
+#ifdef LOSCFG_NET_CONTAINER
+    NETIF_FOREACH(netif, group) {
+#else
     NETIF_FOREACH(netif) {
+#endif
       if (netif_is_up(netif)) {
         return netif;
       }
@@ -212,9 +237,14 @@ ip4_route(const ip4_addr_t *dest)
   }
 #endif
 #endif /* !LWIP_SINGLE_NETIF */
-
+#ifdef LOSCFG_NET_CONTAINER
+  if ((group->netif_default == NULL) || !netif_is_up(group->netif_default) ||
+      !netif_is_link_up(group->netif_default) ||
+      ip4_addr_isany_val(*netif_ip4_addr(group->netif_default)) || ip4_addr_isloopback(dest)) {
+#else
   if ((netif_default == NULL) || !netif_is_up(netif_default) || !netif_is_link_up(netif_default) ||
       ip4_addr_isany_val(*netif_ip4_addr(netif_default)) || ip4_addr_isloopback(dest)) {
+#endif
     /* No matching netif found and default netif is not usable.
        If this is not good enough for you, use LWIP_HOOK_IP4_ROUTE() */
     LWIP_DEBUGF(IP_DEBUG | LWIP_DBG_LEVEL_SERIOUS, ("ip4_route: No route to %"U16_F".%"U16_F".%"U16_F".%"U16_F"\n",
@@ -223,8 +253,11 @@ ip4_route(const ip4_addr_t *dest)
     MIB2_STATS_INC(mib2.ipoutnoroutes);
     return NULL;
   }
-
+#ifdef LOSCFG_NET_CONTAINER
+  return group->netif_default;
+#else
   return netif_default;
+#endif
 }
 
 #if IP_FORWARD
@@ -441,6 +474,10 @@ ip4_input(struct pbuf *p, struct netif *inp)
   IP_STATS_INC(ip.recv);
   MIB2_STATS_INC(mib2.ipinreceives);
 
+#ifdef LOSCFG_NET_CONTAINER
+  struct net_group *group = get_net_group_from_netif(inp);
+#endif
+
   /* identify the IP header */
   iphdr = (struct ip_hdr *)p->payload;
   if (IPH_V(iphdr) != 4) {
@@ -552,7 +589,11 @@ ip4_input(struct pbuf *p, struct netif *inp)
 #endif /* !LWIP_NETIF_LOOPBACK || LWIP_HAVE_LOOPIF */
       {
 #if !LWIP_SINGLE_NETIF
+#ifdef LOSCFG_NET_CONTAINER
+        NETIF_FOREACH(netif, group) {
+#else
         NETIF_FOREACH(netif) {
+#endif
           if (netif == inp) {
             /* we checked that before already */
             continue;
@@ -1031,8 +1072,13 @@ ip4_output(struct pbuf *p, const ip4_addr_t *src, const ip4_addr_t *dest,
   struct netif *netif;
 
   LWIP_IP_CHECK_PBUF_REF_COUNT_FOR_TX(p);
+#ifdef LOSCFG_NET_CONTAINER
+  struct net_group *group = get_curr_process_net_group();
 
+  if ((netif = ip4_route_src(src, dest, group)) == NULL) {
+#else
   if ((netif = ip4_route_src(src, dest)) == NULL) {
+#endif
     LWIP_DEBUGF(IP_DEBUG, ("ip4_output: No route to %"U16_F".%"U16_F".%"U16_F".%"U16_F"\n",
                            ip4_addr1_16(dest), ip4_addr2_16(dest), ip4_addr3_16(dest), ip4_addr4_16(dest)));
     IP_STATS_INC(ip.rterr);

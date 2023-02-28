@@ -132,11 +132,23 @@ static struct netif *
 tcp_route(const struct tcp_pcb *pcb, const ip_addr_t *src, const ip_addr_t *dst)
 {
   LWIP_UNUSED_ARG(src); /* in case IPv4-only and source-based routing is disabled */
+#ifdef LOSCFG_NET_CONTAINER
+  struct net_group *group = get_net_group_from_tcp_pcb(pcb);
+  LWIP_ERROR("tcp_route: invalid net group", group != NULL, return NULL);
+#endif
 
   if ((pcb != NULL) && (pcb->netif_idx != NETIF_NO_INDEX)) {
+#ifdef LOSCFG_NET_CONTAINER
+    return netif_get_by_index(pcb->netif_idx, group);
+#else
     return netif_get_by_index(pcb->netif_idx);
+#endif
   } else {
+#ifdef LOSCFG_NET_CONTAINER
+    return ip_route(src, dst, group);
+#else
     return ip_route(src, dst);
+#endif
   }
 }
 
