@@ -73,6 +73,7 @@ static void tcpip_thread_handle_msg(struct tcpip_msg *msg);
 #else /* !LWIP_TIMERS */
 /* wait for a message, timeouts are processed while waiting */
 #define TCPIP_MBOX_FETCH(mbox, msg) tcpip_timeouts_mbox_fetch(mbox, msg)
+#if !LWIP_LOWPOWER
 /**
  * Wait (forever) for a message to arrive in an mbox.
  * While waiting, timeouts are processed.
@@ -111,6 +112,7 @@ again:
     goto again;
   }
 }
+#endif /* !LWIP_LOWPOWER */
 #endif /* !LWIP_TIMERS */
 
 /**
