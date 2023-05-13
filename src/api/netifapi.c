@@ -384,4 +384,45 @@ netifapi_netif_index_to_name(u8_t idx, char *name)
   return err;
 }
 
+#if LWIP_LOWPOWER
+static err_t
+netifapi_do_set_lowpower_mod(struct tcpip_api_call_data *m)
+{
+  struct netifapi_msg *msg = (struct netifapi_msg *)(void *)m;
+  enum lowpower_mod mod = msg->msg.lp.mod;
+  set_lowpower_mod(mod);
+  return ERR_OK;
+}
+
+err_t
+netifapi_enable_lowpower(void)
+{
+  err_t err;
+  NETIFAPI_VAR_DECLARE(msg);
+
+  NETIFAPI_VAR_ALLOC(msg);
+
+  NETIFAPI_VAR_REF(msg).msg.lp.mod = LOW_TMR_LOWPOWER_MOD;
+
+  err = tcpip_api_call(netifapi_do_set_lowpower_mod, &API_VAR_REF(msg).call);
+  NETIFAPI_VAR_FREE(msg);
+  return err;
+}
+
+err_t
+netifapi_disable_lowpower(void)
+{
+  err_t err;
+  NETIFAPI_VAR_DECLARE(msg);
+
+  NETIFAPI_VAR_ALLOC(msg);
+
+  NETIFAPI_VAR_REF(msg).msg.lp.mod = LOW_TMR_NORMAL_MOD;
+
+  err = tcpip_api_call(netifapi_do_set_lowpower_mod, &API_VAR_REF(msg).call);
+  NETIFAPI_VAR_FREE(msg);
+  return err;
+}
+#endif /* LWIP_LOWPOWER */
+
 #endif /* LWIP_NETIF_API */

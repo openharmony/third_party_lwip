@@ -160,6 +160,11 @@ void dhcp_coarse_tmr(void);
 /* to be called every half second */
 void dhcp_fine_tmr(void);
 
+#if LWIP_LOWPOWER
+u32_t dhcp_coarse_tmr_tick(void);
+u32_t dhcp_fine_tmr_tick(void);
+#endif
+
 #if LWIP_DHCP_GET_NTP_SRV
 /** This function must exist, in other to add offered NTP servers to
  * the NTP (or SNTP) engine.

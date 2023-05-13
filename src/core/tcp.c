@@ -254,6 +254,189 @@ tcp_tmr(void)
   }
 }
 
+#if LWIP_LOWPOWER
+#include "lwip/lowpower.h"
+
+static u32_t
+tcp_set_timer_tick_by_persist(struct tcp_pcb *pcb, u32_t tick)
+{
+  u32_t val;
+
+  if (pcb->persist_backoff > 0) {
+    u8_t backoff_cnt = tcp_persist_backoff[pcb->persist_backoff - 1];
+    SET_TMR_TICK(tick, backoff_cnt);
+    return tick;
+  }
+
+  /* timer not running */
+  if (pcb->rtime >= 0) {
+    val = pcb->rto - pcb->rtime;
+    if (val == 0) {
+      val = 1;
+    }
+    SET_TMR_TICK(tick, val);
+  }
+  return tick;
+}
+
+static u32_t
+tcp_set_timer_tick_by_keepalive(struct tcp_pcb *pcb, u32_t tick)
+{
+  u32_t val;
+
+  if (ip_get_option(pcb, SOF_KEEPALIVE) &&
+      ((pcb->state == ESTABLISHED) ||
+       (pcb->state == CLOSE_WAIT))) {
+    u32_t idle = (pcb->keep_idle) / TCP_SLOW_INTERVAL;
+    if (pcb->keep_cnt_sent == 0) {
+      val = idle - (tcp_ticks - pcb->tmr);
+    } else {
+      val = (tcp_ticks - pcb->tmr) - idle;
+      idle = (TCP_KEEP_INTVL(pcb) / TCP_SLOW_INTERVAL);
+      val  = idle - (val % idle);
+    }
+    /* need add 1 to trig timer */
+    val++;
+    SET_TMR_TICK(tick, val);
+  }
+
+  return tick;
+}
+
+static u32_t tcp_set_timer_tick_by_tcp_state(struct tcp_pcb *pcb, u32_t tick)
+{
+  u32_t val;
+
+  /* Check if this PCB has stayed too long in FIN-WAIT-2 */
+  if (pcb->state == FIN_WAIT_2) {
+    /* If this PCB is in FIN_WAIT_2 because of SHUT_WR don't let it time out. */
+    if (pcb->flags & TF_RXCLOSED) {
+      val = TCP_FIN_WAIT_TIMEOUT / TCP_SLOW_INTERVAL;
+      SET_TMR_TICK(tick, val);
+    }
+  }
+
+  /* Check if this PCB has stayed too long in SYN-RCVD */
+  if (pcb->state == SYN_RCVD) {
+    val = TCP_SYN_RCVD_TIMEOUT / TCP_SLOW_INTERVAL;
+    SET_TMR_TICK(tick, val);
+  }
+
+  /* Check if this PCB has stayed too long in LAST-ACK */
+  if (pcb->state == LAST_ACK) {
+    /*
+     * In a TCP connection the end that performs the active close
+     * is required to stay in TIME_WAIT state for 2MSL of time
+     */
+    val = (2 * TCP_MSL) / TCP_SLOW_INTERVAL;
+    SET_TMR_TICK(tick, val);
+  }
+
+  return tick;
+}
+
+#if DRIVER_STATUS_CHECK
+static u32_t tcp_set_timer_tick_by_driver_status(struct tcp_pcb *pcb, u32_t tick, bool drv_flag)
+{
+  u32_t val;
+
+  struct netif *netif = NULL;
+  if ((tcp_active_pcbs != NULL) && (drv_flag == lwIP_TRUE)) {
+    for (netif = netif_list; netif != NULL; netif = netif->next) {
+      /* network mask matches? */
+      if ((!(netif->flags & NETIF_FLAG_DRIVER_RDY) != 0)) {
+        val = DRIVER_WAKEUP_COUNT - netif->waketime + 1;
+        SET_TMR_TICK(tick, val);
+      }
+    }
+  }
+
+  return tick;
+}
+#endif
+
+u32_t
+tcp_slow_tmr_tick(void)
+{
+  struct tcp_pcb *pcb = NULL;
+  u32_t tick = 0;
+#if DRIVER_STATUS_CHECK
+  bool drv_flag = lwIP_FALSE;
+#endif
+
+  pcb = tcp_active_pcbs;
+  while (pcb != NULL) {
+    if (((pcb->state == SYN_SENT) && (pcb->nrtx >= TCP_SYNMAXRTX)) ||
+        (((pcb->state == FIN_WAIT_1) || (pcb->state == CLOSING)) && (pcb->nrtx >= TCP_FW1MAXRTX)) ||
+        (pcb->nrtx >= TCP_MAXRTX)) {
+      return 1;
+    }
+
+    tick = tcp_set_timer_tick_by_persist(pcb, tick);
+
+#if DRIVER_STATUS_CHECK
+    if (pcb->drv_status == DRV_NOT_READY) {
+      /* iterate through netifs */
+      drv_flag = lwIP_TRUE;
+    }
+#endif /* DRIVER_STATUS_CHECK */
+
+    tick = tcp_set_timer_tick_by_keepalive(pcb, tick);
+
+    /*
+     * If this PCB has queued out of sequence data, but has been
+     * inactive for too long, will drop the data (it will eventually
+     * be retransmitted).
+     */
+#if TCP_QUEUE_OOSEQ
+    if (pcb->ooseq != NULL) {
+      SET_TMR_TICK(tick, 1);
+    }
+#endif /* TCP_QUEUE_OOSEQ */
+
+    tick = tcp_set_timer_tick_by_tcp_state(pcb, tick);
+
+    u8_t ret = poll_tcp_needed(pcb->callback_arg, pcb);
+    if ((pcb->poll != NULL) && (ret != 0)) {
+      SET_TMR_TICK(tick, 1);
+    }
+    pcb = pcb->next;
+  }
+
+#if DRIVER_STATUS_CHECK
+  tick = tcp_set_timer_tick_by_driver_status(pcb, tick, drv_flag);
+#endif /* DRIVER_STATUS_CHECK */
+
+  LOWPOWER_DEBUG(("%s:%d tmr tick: %u\n", __func__, __LINE__, tick));
+  return tick;
+}
+
+u32_t
+tcp_fast_tmr_tick(void)
+{
+  struct tcp_pcb *pcb = NULL;
+
+  pcb = tcp_active_pcbs;
+  while (pcb != NULL) {
+    /* send delayed ACKs or send pending FIN */
+    if ((pcb->flags & TF_ACK_DELAY) ||
+        (pcb->flags & TF_CLOSEPEND) ||
+        (pcb->refused_data != NULL) ||
+        (pcb->tcp_pcb_flag & TCP_PBUF_FLAG_TCP_FIN_RECV_SYSPOST_FAIL)
+#if LWIP_TCP_TLP_SUPPORT
+        || (pcb->tlp_time_stamp != 0)
+#endif /* LWIP_TCP_TLP_SUPPORT */
+       ) {
+      LOWPOWER_DEBUG(("%s:%d tmr tick: 1\n", __func__, __LINE__));
+      return 1;
+    }
+    pcb = pcb->next;
+  }
+  LOWPOWER_DEBUG(("%s:%d tmr tick: 0\n", __func__, __LINE__));
+  return 0;
+}
+#endif /* LWIP_LOWPOWER */
+
 #if LWIP_CALLBACK_API || TCP_LISTEN_BACKLOG
 /** Called when a listen pcb is closed. Iterates one pcb list and removes the
  * closed listener pcb from pcb->listener if matching.

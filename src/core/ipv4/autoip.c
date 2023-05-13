@@ -360,6 +360,31 @@ autoip_stop(struct netif *netif)
   return ERR_OK;
 }
 
+#if LWIP_LOWPOWER
+#include "lwip/lowpower.h"
+u32_t
+autoip_tmr_tick(void)
+{
+  struct netif *netif = netif_list;
+  u32_t tick = 0;
+
+  while (netif != NULL) {
+    struct autoip *autoip = netif_autoip_data(netif);
+    if ((autoip != NULL) && (autoip->ttw > 0)) {
+      if ((autoip->state == AUTOIP_STATE_PROBING) ||
+          (autoip->state == AUTOIP_STATE_ANNOUNCING)) {
+        SET_TMR_TICK(tick, autoip->ttw);
+      }
+    }
+    netif = netif->next;
+  }
+
+  LOWPOWER_DEBUG(("%s tmr tick: %u\n", __func__, tick));
+  return tick;
+}
+
+#endif
+
 /**
  * Has to be called in loop every AUTOIP_TMR_INTERVAL milliseconds
  */

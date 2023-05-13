@@ -467,6 +467,120 @@ dhcp_coarse_tmr(void)
   }
 }
 
+#if LWIP_LOWPOWER
+#include "lwip/lowpower.h"
+
+static u32_t
+dhcp_netif_coarse_tmr_tick(struct dhcp *netif_dhcp)
+{
+  struct dhcp_state *dhcp_state = NULL;
+  struct dhcp_client *client = NULL;
+  s32_t i;
+  u32_t tick = 0;
+  u32_t val;
+  u16_t lease_used;
+
+  for (i = 0; i < DHCP_CLIENT_NUM; i++) {
+    dhcp_state = &((netif_dhcp->client.states)[i]);
+    if ((i != LWIP_DHCP_NATIVE_IDX) && (dhcp_state->idx == 0)) {
+      continue;
+    }
+    if ((dhcp_state->state == DHCP_STATE_OFF)) {
+      continue;
+    }
+
+    client = &(netif_dhcp->client);
+    lease_used = dhcp_state->lease_used;
+    if (client->t0_timeout > 0) {
+      if (client->t0_timeout > lease_used) {
+        val = client->t0_timeout - lease_used;
+        SET_TMR_TICK(tick, val);
+      } else {
+        SET_TMR_TICK(tick, 1);
+      }
+    }
+
+    if (client->t2_timeout > 0) {
+      if (client->t2_timeout > lease_used) {
+        val = (client->t2_timeout - lease_used);
+        SET_TMR_TICK(tick, val);
+      } else if (dhcp_state->re_time > 0) {
+        val = dhcp_state->re_time;
+        SET_TMR_TICK(tick, val);
+      } else {
+        SET_TMR_TICK(tick, 1);
+      }
+    }
+
+    if (dhcp_state->re_time > 0) {
+      val = dhcp_state->re_time;
+      SET_TMR_TICK(tick, val);
+    }
+  }
+
+  return tick;
+}
+
+u32_t
+dhcp_coarse_tmr_tick(void)
+{
+  struct netif *netif = netif_list;
+  u32_t tick = 0;
+  u32_t val;
+
+  while (netif != NULL) {
+    /* only act on DHCP configured interfaces */
+    struct dhcp *netif_dhcp = netif_dhcp_data(netif);
+    if (netif_dhcp == NULL) {
+      /* proceed to next netif */
+      netif = netif->next;
+      continue;
+    }
+    val = dhcp_netif_coarse_tmr_tick(netif_dhcp);
+    SET_TMR_TICK(tick, val);
+    /* proceed to next netif */
+    netif = netif->next;
+  }
+
+  LOWPOWER_DEBUG(("%s tmr tick: %u\n", __func__, tick));
+  return tick;
+}
+
+u32_t
+dhcp_fine_tmr_tick(void)
+{
+  struct netif *netif = netif_list;
+  struct dhcp_state *dhcp_state = NULL;
+  int i;
+  u32_t tick = 0;
+  u32_t val;
+
+  /* loop through netif's */
+  while (netif != NULL) {
+    struct dhcp *netif_dhcp = netif_dhcp_data(netif);
+    if (netif_dhcp == NULL) {
+      netif = netif->next;
+      continue;
+    }
+
+    for (i = 0; i < DHCP_CLIENT_NUM; i++) {
+      dhcp_state = &((netif_dhcp->client.states)[i]);
+      if ((i != LWIP_DHCP_NATIVE_IDX) && (dhcp_state->idx == 0)) {
+        continue;
+      }
+      if (dhcp_state->request_timeout >= 1) {
+        val = dhcp_state->request_timeout;
+        SET_TMR_TICK(tick, val);
+      }
+    }
+    /* proceed to next network interface */
+    netif = netif->next;
+  }
+  LOWPOWER_DEBUG(("%s tmr tick: %d\n", __func__, tick));
+  return tick;
+}
+#endif /* LWIP_LOWPOWER */
+
 /**
  * DHCP transaction timeout handling (this function must be called every 500ms,
  * see @ref DHCP_FINE_TIMER_MSECS).

@@ -72,6 +72,10 @@
 #include LWIP_HOOK_FILENAME
 #endif
 
+#if LWIP_LOWPOWER
+#include "lwip/lowpower.h"
+#endif
+
 /* If the netconn API is not required publicly, then we include the necessary
    files here to get the implementation */
 #if !LWIP_NETCONN
@@ -3300,6 +3304,9 @@ lwip_setsockopt(int s, int level, int optname, const void *optval, socklen_t opt
   LOCK_TCPIP_CORE();
   err = lwip_setsockopt_impl(s, level, optname, optval, optlen);
   UNLOCK_TCPIP_CORE();
+#if LWIP_LOWPOWER
+  tcpip_send_msg_na(LOW_NON_BLOCK);
+#endif
 
 #else /* LWIP_TCPIP_CORE_LOCKING */
 
