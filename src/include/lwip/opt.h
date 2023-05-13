@@ -3523,4 +3523,45 @@
  * @}
  */
 
+/**
+ * enable LWIP_LOWPOWER macro to use lowpower function
+ */
+#undef LWIP_LOWPOWER
+#if LWIP_TIMERS && !LWIP_TIMERS_CUSTOM
+#if defined (CONFIG_LWIP_LOWPOWER)
+#define LWIP_LOWPOWER 1
+#else
+#define LWIP_LOWPOWER 0
+#endif
+#else
+#define LWIP_LOWPOWER 0
+#endif
+
+#if LWIP_LOWPOWER
+
+#ifndef LOWPOWER_DBG
+#define LOWPOWER_DBG     0
+#endif
+
+#if LOWPOWER_DBG
+#define LOWPOWER_DEBUG(msg) printf msg
+#else
+#define LOWPOWER_DEBUG(msg)
+#endif
+
+#ifndef MEMP_NUM_TCPIP_MSG_LOWPOWER
+#define MEMP_NUM_TCPIP_MSG_LOWPOWER 10
+#endif
+
+#if LWIP_SNTP
+#define LWIP_NSTP_TIMER    2
+#else
+#define LWIP_NSTP_TIMER    0
+#endif
+
+#define LOWPOWER_TCP_TIMER 1
+
+#define MEMP_NUM_SYS_TIMEOUT_LOW (MEMP_NUM_SYS_TIMEOUT + LWIP_NSTP_TIMER + LOWPOWER_TCP_TIMER)
+#endif /* LWIP_LOWPOWER */
+
 #endif /* LWIP_HDR_OPT_H */
