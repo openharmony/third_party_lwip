@@ -111,6 +111,9 @@
 #include "lwip/ip6.h"
 #include "lwip/ip6_addr.h"
 #include "lwip/nd6.h"
+#if LWIP_LOWPOWER
+#include "lwip/priv/api_msg.h"
+#endif
 
 #include <string.h>
 
@@ -344,7 +347,7 @@ tcp_slow_tmr_tick(void)
   pcb = tcp_active_pcbs;
   while (pcb != NULL) {
     if (((pcb->state == SYN_SENT) && (pcb->nrtx >= TCP_SYNMAXRTX)) ||
-        (((pcb->state == FIN_WAIT_1) || (pcb->state == CLOSING)) && (pcb->nrtx >= TCP_FW1MAXRTX)) ||
+        ((pcb->state == FIN_WAIT_1) || (pcb->state == CLOSING)) ||
         (pcb->nrtx >= TCP_MAXRTX)) {
       return 1;
     }
@@ -386,8 +389,7 @@ tcp_fast_tmr_tick(void)
     /* send delayed ACKs or send pending FIN */
     if ((pcb->flags & TF_ACK_DELAY) ||
         (pcb->flags & TF_CLOSEPEND) ||
-        (pcb->refused_data != NULL) ||
-        (pcb->tcp_pcb_flag & TCP_PBUF_FLAG_TCP_FIN_RECV_SYSPOST_FAIL)
+        (pcb->refused_data != NULL)
        ) {
       LOWPOWER_DEBUG(("%s:%d tmr tick: 1\n", __func__, __LINE__));
       return 1;
