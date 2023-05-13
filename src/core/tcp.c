@@ -335,34 +335,11 @@ static u32_t tcp_set_timer_tick_by_tcp_state(struct tcp_pcb *pcb, u32_t tick)
   return tick;
 }
 
-#if DRIVER_STATUS_CHECK
-static u32_t tcp_set_timer_tick_by_driver_status(struct tcp_pcb *pcb, u32_t tick, bool drv_flag)
-{
-  u32_t val;
-
-  struct netif *netif = NULL;
-  if ((tcp_active_pcbs != NULL) && (drv_flag == lwIP_TRUE)) {
-    for (netif = netif_list; netif != NULL; netif = netif->next) {
-      /* network mask matches? */
-      if ((!(netif->flags & NETIF_FLAG_DRIVER_RDY) != 0)) {
-        val = DRIVER_WAKEUP_COUNT - netif->waketime + 1;
-        SET_TMR_TICK(tick, val);
-      }
-    }
-  }
-
-  return tick;
-}
-#endif
-
 u32_t
 tcp_slow_tmr_tick(void)
 {
   struct tcp_pcb *pcb = NULL;
   u32_t tick = 0;
-#if DRIVER_STATUS_CHECK
-  bool drv_flag = lwIP_FALSE;
-#endif
 
   pcb = tcp_active_pcbs;
   while (pcb != NULL) {
@@ -373,14 +350,6 @@ tcp_slow_tmr_tick(void)
     }
 
     tick = tcp_set_timer_tick_by_persist(pcb, tick);
-
-#if DRIVER_STATUS_CHECK
-    if (pcb->drv_status == DRV_NOT_READY) {
-      /* iterate through netifs */
-      drv_flag = lwIP_TRUE;
-    }
-#endif /* DRIVER_STATUS_CHECK */
-
     tick = tcp_set_timer_tick_by_keepalive(pcb, tick);
 
     /*
@@ -403,10 +372,6 @@ tcp_slow_tmr_tick(void)
     pcb = pcb->next;
   }
 
-#if DRIVER_STATUS_CHECK
-  tick = tcp_set_timer_tick_by_driver_status(pcb, tick, drv_flag);
-#endif /* DRIVER_STATUS_CHECK */
-
   LOWPOWER_DEBUG(("%s:%d tmr tick: %u\n", __func__, __LINE__, tick));
   return tick;
 }
@@ -423,9 +388,6 @@ tcp_fast_tmr_tick(void)
         (pcb->flags & TF_CLOSEPEND) ||
         (pcb->refused_data != NULL) ||
         (pcb->tcp_pcb_flag & TCP_PBUF_FLAG_TCP_FIN_RECV_SYSPOST_FAIL)
-#if LWIP_TCP_TLP_SUPPORT
-        || (pcb->tlp_time_stamp != 0)
-#endif /* LWIP_TCP_TLP_SUPPORT */
        ) {
       LOWPOWER_DEBUG(("%s:%d tmr tick: 1\n", __func__, __LINE__));
       return 1;

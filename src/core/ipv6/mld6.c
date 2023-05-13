@@ -532,38 +532,6 @@ mld6_tmr(void)
 #if LWIP_LOWPOWER
 #include "lwip/lowpower.h"
 
-#if LWIP_IPV6_MLD_QUERIER
-static u32_t
-get_mld6_querier_tmr_listener(struct mld6_listener *listener)
-{
-  u32_t tick = 0;
-  u32_t val;
-
-  if (listener->timer < 1) {
-    return 0;
-  }
-  val = listener->timer;
-  SET_TMR_TICK(tick, val);
-
-  /* here timer is greater than 0 */
-  if (listener->state != MLD6_LISTENER_STATE_CHECK) {
-    return tick;
-  }
-
-  /* here state is MLD6_LISTENER_STATE_CHECK */
-  if (listener->rexmt_timer > 0) {
-    SET_TMR_TICK(tick, listener->rexmt_timer);
-    return tick;
-  }
-
-  if (listener->query_count < MLD6_LAST_LISTENER_QUERY_COUNT) {
-    val = (u32_t)MLD6_LAST_LISTENER_QUERY_COUNT - listener->query_count;
-    SET_TMR_TICK(tick, val);
-  }
-  return tick;
-}
-#endif /* #if LWIP_IPV6_MLD_QUERIER */
-
 u32_t
 mld6_tmr_tick(void)
 {
@@ -580,24 +548,6 @@ mld6_tmr_tick(void)
       }
       group = group->next;
     }
-
-#if LWIP_IPV6_MLD_QUERIER
-    struct mld6_querier *querier = netif_mld6_querier_data(netif);
-    if (querier == NULL) {
-      netif = netif->next;
-      continue;
-    }
-    if (querier->timer > 0) {
-      SET_TMR_TICK(tick, querier->timer);
-    }
-
-    listener = querier->listeners;
-    while (listener != NULL) {
-      val = get_mld6_querier_tmr_listener(listener);
-      SET_TMR_TICK(tick, val);
-      listener = listener->next;
-    }
-#endif /* LWIP_IPV6_MLD_QUERIER */
     netif = netif->next;
   }
 

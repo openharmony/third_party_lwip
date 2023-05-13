@@ -240,12 +240,12 @@ tcpip_send_msg_na(enum lowpower_msg_type type)
   msg = (struct tcpip_msg *)memp_malloc(MEMP_TCPIP_MSG_LOWPOWER);
   if (msg == NULL) {
     LWIP_DEBUGF(TCPIP_DEBUG, ("tcpip_send_msg_na alloc faild\n"));
-    return ;
+    return;
   }
   if (!sys_dual_mbox_valid(MBOXPTR)) {
     LWIP_DEBUGF(TCPIP_DEBUG, ("tcpip_send_msg_na mbox invalid\n"));
     memp_free(MEMP_TCPIP_MSG_LOWPOWER, msg);
-    return ;
+    return;
   }
 
   /* just wake up thread if nonblock */

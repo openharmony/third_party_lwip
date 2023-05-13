@@ -1205,13 +1205,8 @@ nd6_tmr_tick(void)
   /* Process router entries. */
   for (i = 0; i < LWIP_ND6_NUM_ROUTERS; i++) {
     if (default_router_list[i].neighbor_entry != NULL) {
-#if LWIP_ND6_STATIC_DEFAULT_ROUTE
-      if (!LWIP_IS_STATIC_ROUTE(default_router_list[i]))
-#endif
-      {
-        val = default_router_list[i].invalidation_timer;
-        SET_TMR_TICK(tick, val);
-      }
+      val = default_router_list[i].invalidation_timer;
+      SET_TMR_TICK(tick, val);
     }
   }
 
@@ -1264,22 +1259,6 @@ nd6_tmr_tick(void)
     SET_TMR_TICK(tick, val);
   }
 #endif /* LWIP_IPV6_SEND_ROUTER_SOLICIT */
-
-#if LWIP_ND6_ROUTER
-  for (netif = netif_list; netif != NULL; netif = netif->next) {
-    /* Do not send NS/NA/RS/RA packets to loopback interface */
-    if ((netif->flags & NETIF_FLAG_LOOPBACK) != 0) {
-      continue;
-    }
-
-    if ((netif->ra_enable != lwIP_TRUE) || ((netif->flags & NETIF_FLAG_UP) == 0) ||
-        (ip6_addr_isinvalid(netif_ip6_addr_state(netif, 0)))) {
-      continue;
-    }
-    val = netif->ra_timer;
-    SET_TMR_TICK(tick, val);
-  }
-#endif
 
   LOWPOWER_DEBUG(("%s tmr tick: %u\n", __func__, tick));
   return tick;
