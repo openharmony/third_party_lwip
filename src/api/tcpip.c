@@ -49,6 +49,9 @@
 #include "lwip/pbuf.h"
 #include "lwip/etharp.h"
 #include "netif/ethernet.h"
+#if LWIP_LOWPOWER
+#include "lwip/lowpower.h"
+#endif
 
 #define TCPIP_MSG_VAR_REF(name)     API_VAR_REF(name)
 #define TCPIP_MSG_VAR_DECLARE(name) API_VAR_DECLARE(struct tcpip_msg, name)
@@ -242,11 +245,6 @@ tcpip_send_msg_na(enum lowpower_msg_type type)
     LWIP_DEBUGF(TCPIP_DEBUG, ("tcpip_send_msg_na alloc faild\n"));
     return;
   }
-  if (!sys_dual_mbox_valid(MBOXPTR)) {
-    LWIP_DEBUGF(TCPIP_DEBUG, ("tcpip_send_msg_na mbox invalid\n"));
-    memp_free(MEMP_TCPIP_MSG_LOWPOWER, msg);
-    return;
-  }
 
   /* just wake up thread if nonblock */
   msg->type = TCPIP_MSG_NA;
@@ -261,7 +259,7 @@ tcpip_send_msg_na(enum lowpower_msg_type type)
     }
   }
 
-  if (TCPIP_MBOX_TRYPOST(MBOXPTR, msg) != ERR_OK) {
+  if (sys_mbox_trypost(&tcpip_mbox, msg) != ERR_OK) {
     if (type == LOW_BLOCK) {
       LOWPOWER_SEM_FREE(msg->msg.lowpower.wait_up);
     }

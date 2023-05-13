@@ -26,7 +26,6 @@
 #include "lwip/sys.h"
 #include "lwip/pbuf.h"
 #include "netif/lowpan6.h"
-#include "lwip/nat64.h"
 #include "lwip/api.h"
 
 #if LWIP_LOWPOWER
@@ -341,7 +340,7 @@ tcpip_timeouts_mbox_fetch(sys_mbox_t *mbox, void **msg)
 again:
   if (g_timer_header == NULL) {
     UNLOCK_TCPIP_CORE();
-    (void)sys_arch_mbox_fetch_ext(mbox, msg, 0, 0);
+    (void)sys_arch_mbox_fetch(mbox, msg, 0);
     LOCK_TCPIP_CORE();
     return;
   }
@@ -353,7 +352,7 @@ again:
 
   sys_timeout_set_wake_time(TIMEOUT_MAX);
   UNLOCK_TCPIP_CORE();
-  ret = sys_arch_mbox_fetch_ext(mbox, msg, sleeptime, 0);
+  ret = sys_arch_mbox_fetch(mbox, msg, sleeptime);
   LOCK_TCPIP_CORE();
   set_timer_state(LOW_TMR_TIMER_HANDLING, 0);
   now = sys_now();

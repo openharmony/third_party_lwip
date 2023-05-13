@@ -536,8 +536,6 @@ u32_t
 mld6_tmr_tick(void)
 {
   struct netif *netif = netif_list;
-  struct mld6_listener *listener = NULL;
-  u32_t val = 0;
   u32_t tick = 0;
 
   while (netif != NULL) {
