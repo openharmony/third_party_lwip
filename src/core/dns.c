@@ -426,17 +426,6 @@ dns_tmr_tick(void)
       val = dns_table[i].ttl;
       SET_TMR_TICK(tick, val);
     }
-#if LWIP_DNS_REVERSE
-    if ((reverse_dns_table[i].state == DNS_STATE_NEW) ||
-        (reverse_dns_table[i].state == DNS_STATE_ASKING)) {
-      LOWPOWER_DEBUG(("%s tmr tick: 1\n", __func__));
-      return 1;
-    }
-    if (reverse_dns_table[i].state == DNS_STATE_DONE) {
-      val = reverse_dns_table[i].ttl;
-      SET_TMR_TICK(tick, val);
-    }
-#endif
   }
   LOWPOWER_DEBUG(("%s tmr tick: %u\n", __func__, tick));
   return tick;
