@@ -115,6 +115,10 @@ struct ip6_reassdata {
 void ip6_reass_tmr(void);
 struct pbuf *ip6_reass(struct pbuf *p);
 
+#if LWIP_LOWPOWER
+u32_t ip6_reass_tmr_tick(void);
+#endif
+
 #endif /* LWIP_IPV6 && LWIP_IPV6_REASS */
 
 #if LWIP_IPV6 && LWIP_IPV6_FRAG  /* don't build if not configured for use in lwipopts.h */

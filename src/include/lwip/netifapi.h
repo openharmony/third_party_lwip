@@ -156,6 +156,11 @@ err_t netifapi_netif_index_to_name(u8_t index, char *name);
   */
 #define netifapi_autoip_stop(n)       netifapi_netif_common(n, NULL, autoip_stop)
 
+#if LWIP_LOWPOWER
+err_t netifapi_enable_lowpower(void);
+err_t netifapi_disable_lowpower(void);
+#endif
+
 #ifdef __cplusplus
 }
 #endif
