@@ -470,113 +470,58 @@ dhcp_coarse_tmr(void)
 #if LWIP_LOWPOWER
 #include "lwip/lowpower.h"
 
-static u32_t
-dhcp_netif_coarse_tmr_tick(struct dhcp *netif_dhcp)
-{
-  struct dhcp_state *dhcp_state = NULL;
-  struct dhcp_client *client = NULL;
-  s32_t i;
-  u32_t tick = 0;
-  u32_t val;
-  u16_t lease_used;
-
-  for (i = 0; i < DHCP_CLIENT_NUM; i++) {
-    dhcp_state = &((netif_dhcp->client.states)[i]);
-    if ((i != LWIP_DHCP_NATIVE_IDX) && (dhcp_state->idx == 0)) {
-      continue;
-    }
-    if ((dhcp_state->state == DHCP_STATE_OFF)) {
-      continue;
-    }
-
-    client = &(netif_dhcp->client);
-    lease_used = dhcp_state->lease_used;
-    if (client->t0_timeout > 0) {
-      if (client->t0_timeout > lease_used) {
-        val = client->t0_timeout - lease_used;
-        SET_TMR_TICK(tick, val);
-      } else {
-        SET_TMR_TICK(tick, 1);
-      }
-    }
-
-    if (client->t2_timeout > 0) {
-      if (client->t2_timeout > lease_used) {
-        val = (client->t2_timeout - lease_used);
-        SET_TMR_TICK(tick, val);
-      } else if (dhcp_state->re_time > 0) {
-        val = dhcp_state->re_time;
-        SET_TMR_TICK(tick, val);
-      } else {
-        SET_TMR_TICK(tick, 1);
-      }
-    }
-
-    if (dhcp_state->re_time > 0) {
-      val = dhcp_state->re_time;
-      SET_TMR_TICK(tick, val);
-    }
-  }
-
-  return tick;
-}
-
 u32_t
 dhcp_coarse_tmr_tick(void)
 {
-  struct netif *netif = netif_list;
+  struct netif *netif;
   u32_t tick = 0;
-  u32_t val;
-
-  while (netif != NULL) {
-    /* only act on DHCP configured interfaces */
-    struct dhcp *netif_dhcp = netif_dhcp_data(netif);
-    if (netif_dhcp == NULL) {
-      /* proceed to next netif */
-      netif = netif->next;
-      continue;
+  LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_coarse_tmr()\n"));
+  /* iterate through all network interfaces */
+#ifdef LOSCFG_NET_CONTAINER
+  NETIF_FOREACH(netif, get_root_net_group())
+#else
+  NETIF_FOREACH(netif)
+#endif
+  {
+    struct dhcp *dhcp = netif_dhcp_data(netif);
+    if ((dhcp != NULL) && (dhcp->state != DHCP_STATE_OFF)) {
+      if (dhcp->t0_timeout > 0) {
+        if (dhcp->t0_timeout > dhcp->lease_used) {
+          SET_TMR_TICK(tick, dhcp->t0_timeout - dhcp->lease_used);
+        } else {
+          SET_TMR_TICK(tick, 1);
+        }
+      }
+      if (dhcp->t2_rebind_time > 0) {
+        SET_TMR_TICK(tick, dhcp->t2_rebind_time);
+      }
+      if (dhcp->t1_renew_time > 0) {
+        SET_TMR_TICK(tick, dhcp->t1_renew_time);
+      }
     }
-    val = dhcp_netif_coarse_tmr_tick(netif_dhcp);
-    SET_TMR_TICK(tick, val);
-    /* proceed to next netif */
-    netif = netif->next;
   }
-
-  LOWPOWER_DEBUG(("%s tmr tick: %u\n", __func__, tick));
   return tick;
 }
 
 u32_t
 dhcp_fine_tmr_tick(void)
 {
-  struct netif *netif = netif_list;
-  struct dhcp_state *dhcp_state = NULL;
-  int i;
+  struct netif *netif;
   u32_t tick = 0;
-  u32_t val;
-
   /* loop through netif's */
-  while (netif != NULL) {
-    struct dhcp *netif_dhcp = netif_dhcp_data(netif);
-    if (netif_dhcp == NULL) {
-      netif = netif->next;
-      continue;
-    }
-
-    for (i = 0; i < DHCP_CLIENT_NUM; i++) {
-      dhcp_state = &((netif_dhcp->client.states)[i]);
-      if ((i != LWIP_DHCP_NATIVE_IDX) && (dhcp_state->idx == 0)) {
-        continue;
-      }
-      if (dhcp_state->request_timeout >= 1) {
-        val = dhcp_state->request_timeout;
-        SET_TMR_TICK(tick, val);
+#ifdef LOSCFG_NET_CONTAINER
+  NETIF_FOREACH(netif, get_root_net_group())
+#else
+  NETIF_FOREACH(netif)
+#endif
+  {
+    struct dhcp *dhcp = netif_dhcp_data(netif);
+    if (dhcp != NULL) {
+      if (dhcp->request_timeout > 0) {
+        SET_TMR_TICK(tick, dhcp->request_timeout);
       }
     }
-    /* proceed to next network interface */
-    netif = netif->next;
   }
-  LOWPOWER_DEBUG(("%s tmr tick: %d\n", __func__, tick));
   return tick;
 }
 #endif /* LWIP_LOWPOWER */
