@@ -407,8 +407,8 @@ poll_tcp_needed(void *arg, struct tcp_pcb *pcb)
   if ((conn->flags & NETCONN_FLAG_CHECK_WRITESPACE) != 0) {
     /* If the queued byte- or pbuf-count drops below the configured low-water limit,
        let select mark this pcb as writable again. */
-    if ((conn->pcb.tcp != NULL) && (tcp_sndbuf(conn->pcb.tcp) > conn->pcb.tcp->snd_buf_lowat) &&
-        (tcp_sndqueuelen(conn->pcb.tcp) < conn->pcb.tcp->snd_queuelen_lowat)) {
+    if ((conn->pcb.tcp != NULL) && (tcp_sndbuf(conn->pcb.tcp) > TCP_SNDLOWAT) &&
+        (tcp_sndqueuelen(conn->pcb.tcp) < TCP_SNDQUEUELOWAT)) {
       ret = 1;
     }
   }

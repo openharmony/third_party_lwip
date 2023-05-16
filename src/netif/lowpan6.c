@@ -129,7 +129,7 @@ lowpan6_tmr_tick()
   struct lowpan6_reass_helper *lrh_temp = NULL;
   u32_t tick = 0;
 
-  lrh = reass_list;
+  lrh = lowpan6_data.reass_list;
   while (lrh != NULL) {
     lrh_temp = lrh->next_packet;
     if (lrh->timer > 0) {
