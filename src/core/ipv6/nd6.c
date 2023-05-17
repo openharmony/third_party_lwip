@@ -1219,7 +1219,12 @@ nd6_tmr_tick(void)
   }
 
   /* Process our own addresses, updating address lifetimes and/or DAD state. */
-  NETIF_FOREACH(netif) {
+#ifdef LOSCFG_NET_CONTAINER
+  NETIF_FOREACH(netif, get_root_net_group())
+#else
+  NETIF_FOREACH(netif)
+#endif
+  {
     for (i = 0; i < LWIP_IPV6_NUM_ADDRESSES; ++i) {
       u8_t addr_state;
 #if LWIP_IPV6_ADDRESS_LIFETIMES

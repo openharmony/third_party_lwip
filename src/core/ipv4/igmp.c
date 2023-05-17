@@ -673,10 +673,14 @@ igmp_tmr(void)
 u32_t
 igmp_tmr_tick(void)
 {
-  struct netif *netif;
+  struct netif *netif = NULL;
   u32_t tick = 0;
-
-  NETIF_FOREACH(netif) {
+#ifdef LOSCFG_NET_CONTAINER
+  NETIF_FOREACH(netif, get_root_net_group())
+#else
+  NETIF_FOREACH(netif)
+#endif
+  {
     struct igmp_group *group = netif_igmp_data(netif);
     while (group != NULL) {
       if (group->timer > 0) {
@@ -685,7 +689,6 @@ igmp_tmr_tick(void)
       group = group->next;
     }
   }
-
   LOWPOWER_DEBUG(("%s tmr tick: %u\n", __func__, tick));
   return tick;
 }
