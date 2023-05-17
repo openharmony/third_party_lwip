@@ -535,10 +535,15 @@ mld6_tmr(void)
 u32_t
 mld6_tmr_tick(void)
 {
-  struct netif *netif = netif_list;
+  struct netif *netif = NULL;
   u32_t tick = 0;
 
-  while (netif != NULL) {
+#ifdef LOSCFG_NET_CONTAINER
+  NETIF_FOREACH(netif, get_root_net_group())
+#else
+  NETIF_FOREACH(netif)
+#endif
+  {
     struct mld_group *group = netif_mld6_data(netif);
     while (group != NULL) {
       if (group->timer > 0) {
@@ -546,7 +551,6 @@ mld6_tmr_tick(void)
       }
       group = group->next;
     }
-    netif = netif->next;
   }
 
   LOWPOWER_DEBUG(("%s tmr tick: %u\n", __func__, tick));

@@ -365,10 +365,9 @@ autoip_stop(struct netif *netif)
 u32_t
 autoip_tmr_tick(void)
 {
-  struct netif *netif = netif_list;
+  struct netif *netif = NULL;
   u32_t tick = 0;
-
-  while (netif != NULL) {
+  NETIF_FOREACH(netif) {
     struct autoip *autoip = netif_autoip_data(netif);
     if ((autoip != NULL) && (autoip->ttw > 0)) {
       if ((autoip->state == AUTOIP_STATE_PROBING) ||
@@ -376,7 +375,6 @@ autoip_tmr_tick(void)
         SET_TMR_TICK(tick, autoip->ttw);
       }
     }
-    netif = netif->next;
   }
 
   LOWPOWER_DEBUG(("%s tmr tick: %u\n", __func__, tick));
