@@ -152,7 +152,7 @@ ip6_reass_tmr_tick(void)
     SET_TMR_TICK(tick, val);
     r = r->next;
   }
-  LOWPOWER_DEBUG(("%s tmr tick: %u\n", __func__, tick));
+  LOWPOWER_DEBUG(("%s tmr tick: %u\n", "ip6_reass_tmr_tick", tick));
   return tick;
 }
 #endif /* LWIP_LOWPOWER */
