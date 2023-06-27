@@ -553,7 +553,7 @@ mld6_tmr_tick(void)
     }
   }
 
-  LOWPOWER_DEBUG(("%s tmr tick: %u\n", __func__, tick));
+  LOWPOWER_DEBUG(("%s tmr tick: %u\n", "mld6_tmr_tick", tick));
   return tick;
 }
 #endif

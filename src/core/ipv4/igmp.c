@@ -689,7 +689,7 @@ igmp_tmr_tick(void)
       group = group->next;
     }
   }
-  LOWPOWER_DEBUG(("%s tmr tick: %u\n", __func__, tick));
+  LOWPOWER_DEBUG(("%s tmr tick: %u\n", "igmp_tmr_tick", tick));
   return tick;
 }
 #endif

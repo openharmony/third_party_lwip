@@ -375,7 +375,7 @@ tcp_slow_tmr_tick(void)
     pcb = pcb->next;
   }
 
-  LOWPOWER_DEBUG(("%s:%d tmr tick: %u\n", __func__, __LINE__, tick));
+  LOWPOWER_DEBUG(("%s tmr tick: %u\n", "tcp_slow_tmr_tick", tick));
   return tick;
 }
 
@@ -391,12 +391,12 @@ tcp_fast_tmr_tick(void)
         (pcb->flags & TF_CLOSEPEND) ||
         (pcb->refused_data != NULL)
        ) {
-      LOWPOWER_DEBUG(("%s:%d tmr tick: 1\n", __func__, __LINE__));
+      LOWPOWER_DEBUG(("%s tmr tick: 1\n", "tcp_fast_tmr_tick"));
       return 1;
     }
     pcb = pcb->next;
   }
-  LOWPOWER_DEBUG(("%s:%d tmr tick: 0\n", __func__, __LINE__));
+  LOWPOWER_DEBUG(("%s tmr tick: 0\n", "tcp_fast_tmr_tick"));
   return 0;
 }
 #endif /* LWIP_LOWPOWER */

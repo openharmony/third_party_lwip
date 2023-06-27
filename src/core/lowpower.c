@@ -1,12 +1,37 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2019-2020. All rights reserved.
- * Description: implementation for lowpower
- * Author: none
- * Create: 2019
+ * Copyright (c) 2023-2023 Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (c) 2023-2023 Huawei Device Co., Ltd. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice, this list of
+ *    conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice, this list
+ *    of conditions and the following disclaimer in the documentation and/or other materials
+ *    provided with the distribution.
+ *
+ * 3. Neither the name of the copyright holder nor the names of its contributors may be used
+ *    to endorse or promote products derived from this software without specific prior written
+ *    permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+ * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "lwip/opt.h"
 
+#if LWIP_LOWPOWER
 #include "lwip/priv/tcp_priv.h"
 
 #include "lwip/def.h"
@@ -28,10 +53,9 @@
 #include "netif/lowpan6.h"
 #include "lwip/api.h"
 
-#if LWIP_LOWPOWER
 #include "lwip/lowpower.h"
 
-#define TIMEOUT_MAX 120000 /* two min */
+#define TIMEOUT_MAX 120000 /* two mins */
 #define SYS_TIMEOUT_WAIT_TICKS    30
 #define SYS_TIMEOUT_WAIT_TIME_MS  3
 
@@ -77,10 +101,6 @@ static const struct timer_handler lowpower_timer_handler[] = {
 #if LWIP_DNS
   {DNS_TMR_INTERVAL, dns_tmr, dns_tmr_tick DNSTMR_NAME},
 #endif /* LWIP_DNS */
-
-#if LWIP_NAT64
-  {NAT64_TMR_INTERVAL, nat64_tmr, nat64_tmr_tick NAT64TMR_NAME},
-#endif /* LWIP_NAT64 */
 
 #if LWIP_IPV6
   {ND6_TMR_INTERVAL, nd6_tmr, nd6_tmr_tick ND6TMR_NAME},
