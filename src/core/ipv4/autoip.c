@@ -377,7 +377,7 @@ autoip_tmr_tick(void)
     }
   }
 
-  LOWPOWER_DEBUG(("%s tmr tick: %u\n", "autoip_tmr_tick", tick));
+  LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s tmr tick: %u\n", "autoip_tmr_tick", tick));
   return tick;
 }
 

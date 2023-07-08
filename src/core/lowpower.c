@@ -174,7 +174,7 @@ sys_timeout_reg(
 
   timeout = (struct timer_entry *)memp_malloc(MEMP_SYS_TIMEOUT);
   if (timeout == NULL) {
-    LOWPOWER_DEBUG(("sys_timeout_reg: timeout != NULL, pool MEMP_SYS_TIMEOUT is empty"));
+    LWIP_DEBUGF(LOWPOWER_DEBUG, ("sys_timeout_reg: timeout != NULL, pool MEMP_SYS_TIMEOUT is empty"));
     return -1;
   }
 
@@ -210,7 +210,7 @@ timeout_handler(struct timer_entry *t, u32_t now)
 {
 #if LOWPOWER_TIMER_DEBUG
   if (t->name != NULL) {
-    LOWPOWER_DEBUG(("%s timeout: now:%u\n", t->name, now));
+    LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s timeout: now:%u\n", t->name, now));
   }
 #endif
 
@@ -233,7 +233,7 @@ get_timer_tick(struct timer_entry *t)
     tick = t->next_tick();
   } else {
     tick = 1;
-    LOWPOWER_DEBUG(("next->tick is NULL\n"));
+    LWIP_DEBUGF(LOWPOWER_DEBUG, ("next->tick is NULL\n"));
   }
   tick *= t->clock_max;
   return tick;
@@ -274,7 +274,7 @@ get_sleep_time(u32_t now)
   u32_t tick;
   u32_t temp;
 
-  LOWPOWER_DEBUG(("\n*******get_sleep_time*****************\n"));
+  LWIP_DEBUGF(LOWPOWER_DEBUG, ("\n*******get_sleep_time*****************\n"));
 
   for (t = g_timer_header, p = NULL; t != NULL; t = n) {
     n = t->next;
@@ -307,7 +307,7 @@ again:
     p = t;
   }
 
-  LOWPOWER_DEBUG(("msec = %u now = %u\n", msec, now));
+  LWIP_DEBUGF(LOWPOWER_DEBUG, ("msec = %u now = %u\n", msec, now));
   return msec;
 }
 
@@ -321,8 +321,8 @@ check_timeout(u32_t now)
   u32_t ticks;
   u32_t i;
 
-  LOWPOWER_DEBUG(("\n**********timeout**************\n"));
-  LOWPOWER_DEBUG(("now = %u\n", now));
+  LWIP_DEBUGF(LOWPOWER_DEBUG, ("\n**********timeout**************\n"));
+  LWIP_DEBUGF(LOWPOWER_DEBUG, ("now = %u\n", now));
 
   for (t = g_timer_header, p = NULL; t != NULL; t = n) {
     n = t->next;
@@ -420,7 +420,7 @@ sys_timeouts_init(void)
 
   for (i = 0; i < LWIP_ARRAYSIZE(lowpower_timer_handler); i++) {
     if (set_timer_interval(i, lowpower_timer_handler[i].interval) != 0) {
-      LOWPOWER_DEBUG(("ERROR:regist timer faild! i = %u\n", i));
+      LWIP_DEBUGF(LOWPOWER_DEBUG, ("ERROR:regist timer faild! i = %u\n", i));
     }
   }
 }

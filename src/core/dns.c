@@ -419,7 +419,7 @@ dns_tmr_tick(void)
   for (i = 0; i < DNS_TABLE_SIZE; i++) {
     if ((dns_table[i].state == DNS_STATE_NEW) ||
         (dns_table[i].state == DNS_STATE_ASKING)) {
-      LOWPOWER_DEBUG(("%s tmr tick: 1\n", "dns_tmr_tick"));
+      LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s tmr tick: 1\n", "dns_tmr_tick"));
       return 1;
     }
     if (dns_table[i].state == DNS_STATE_DONE) {
@@ -427,7 +427,7 @@ dns_tmr_tick(void)
       SET_TMR_TICK(tick, val);
     }
   }
-  LOWPOWER_DEBUG(("%s tmr tick: %u\n", "dns_tmr_tick", tick));
+  LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s tmr tick: %u\n", "dns_tmr_tick", tick));
   return tick;
 }
 #endif

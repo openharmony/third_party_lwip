@@ -1247,7 +1247,7 @@ nd6_tmr_tick(void)
       /* Step 2: update DAD state. */
       addr_state = netif_ip6_addr_state(netif, i);
       if (ip6_addr_istentative(addr_state)) {
-        LOWPOWER_DEBUG(("%s tmr tick: 1\n", "nd6_tmr_tick"));
+        LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s tmr tick: 1\n", "nd6_tmr_tick"));
         return 1;
       }
     }
@@ -1262,7 +1262,7 @@ nd6_tmr_tick(void)
   }
 #endif /* LWIP_IPV6_SEND_ROUTER_SOLICIT */
 
-  LOWPOWER_DEBUG(("%s tmr tick: %u\n", "nd6_tmr_tick", tick));
+  LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s tmr tick: %u\n", "nd6_tmr_tick", tick));
   return tick;
 }
 #endif /* LWIP_LOWPOWER */
