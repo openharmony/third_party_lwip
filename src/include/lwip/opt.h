@@ -3539,14 +3539,11 @@
 
 #if LWIP_LOWPOWER
 
-#ifndef LOWPOWER_DBG
-#define LOWPOWER_DBG     0
-#endif
-
-#if LOWPOWER_DBG
-#define LOWPOWER_DEBUG(msg) printf msg
-#else
-#define LOWPOWER_DEBUG(msg)
+/**
+ * LOWPOWER_DEBUG: Enable debugging in lowpower.c.
+ */
+#if !defined LOWPOWER_DEBUG || defined __DOXYGEN__
+#define LOWPOWER_DEBUG                 LWIP_DBG_OFF
 #endif
 
 #ifndef MEMP_NUM_TCPIP_MSG_LOWPOWER

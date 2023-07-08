@@ -138,7 +138,7 @@ lowpan6_tmr_tick()
     lrh = lrh_temp;
   }
 
-  LOWPOWER_DEBUG(("%s tmr tick: %u\n", "lowpan6_tmr_tick", tick));
+  LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s tmr tick: %u\n", "lowpan6_tmr_tick", tick));
   return tick;
 }
 #endif /* LWIP_LOWPOWER */

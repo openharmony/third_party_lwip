@@ -204,14 +204,14 @@ etharp_tmr_tick(void)
 #endif /* ETHARP_SUPPORT_STATIC_ENTRIES */
        ) {
       if (arp_table[i].state != ETHARP_STATE_STABLE) {
-        LOWPOWER_DEBUG(("%s tmr tick: 1\n", "etharp_tmr_tick"));
+        LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s tmr tick: 1\n", "etharp_tmr_tick"));
         return 1;
       }
       time = (u32_t)ARP_MAXAGE - arp_table[i].ctime;
       SET_TMR_TICK(tick, time);
     }
   }
-  LOWPOWER_DEBUG(("%s tmr tick: %u\n", "etharp_tmr_tick", tick));
+  LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s tmr tick: %u\n", "etharp_tmr_tick", tick));
   return tick;
 }
 #endif /* LWIP_LOWPOWER */

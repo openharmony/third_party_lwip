@@ -842,7 +842,7 @@ dhcp6_tmr_tick()
       SET_TMR_TICK(tick, dhcp6->request_timeout);
     }
   }
-  LOWPOWER_DEBUG(("%s tmr tick: %u\n", "dhcp6_tmr_tick", tick));
+  LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s tmr tick: %u\n", "dhcp6_tmr_tick", tick));
   return tick;
 }
 #endif /* LWIP_LOWPOWER */
