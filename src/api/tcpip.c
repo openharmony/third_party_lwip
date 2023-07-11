@@ -242,7 +242,7 @@ tcpip_send_msg_na(enum lowpower_msg_type type)
 
   msg = (struct tcpip_msg *)memp_malloc(MEMP_TCPIP_MSG_LOWPOWER);
   if (msg == NULL) {
-    LWIP_DEBUGF(TCPIP_DEBUG, ("tcpip_send_msg_na alloc faild\n"));
+    LWIP_DEBUGF(LOWPOWER_DEBUG, ("tcpip_send_msg_na alloc faild\n"));
     return;
   }
 
@@ -253,7 +253,7 @@ tcpip_send_msg_na(enum lowpower_msg_type type)
   if (type == LOW_BLOCK) {
     LOWPOWER_SEM_NEW(msg->msg.lowpower.wait_up, val);
     if (val != ERR_OK) {
-      LWIP_DEBUGF(TCPIP_DEBUG, ("alloc sem faild\n"));
+      LWIP_DEBUGF(LOWPOWER_DEBUG, ("alloc sem faild\n"));
       memp_free(MEMP_TCPIP_MSG_LOWPOWER, msg);
       return;
     }
@@ -264,7 +264,7 @@ tcpip_send_msg_na(enum lowpower_msg_type type)
       LOWPOWER_SEM_FREE(msg->msg.lowpower.wait_up);
     }
     memp_free(MEMP_TCPIP_MSG_LOWPOWER, msg);
-    LWIP_DEBUGF(TCPIP_DEBUG, ("tcpip_send_msg_na post faild\n"));
+    LWIP_DEBUGF(LOWPOWER_DEBUG, ("tcpip_send_msg_na post faild\n"));
     return;
   }
 
