@@ -93,6 +93,10 @@ err_t etharp_add_static_entry(const ip4_addr_t *ipaddr, struct eth_addr *ethaddr
 err_t etharp_remove_static_entry(const ip4_addr_t *ipaddr);
 #endif /* ETHARP_SUPPORT_STATIC_ENTRIES */
 
+#if LWIP_LOWPOWER
+u32_t etharp_tmr_tick(void);
+#endif /* LWIP_LOWPOWER */
+
 void etharp_input(struct pbuf *p, struct netif *netif);
 
 #ifdef __cplusplus

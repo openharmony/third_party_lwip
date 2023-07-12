@@ -61,6 +61,8 @@
 #include "lwip/sys.h"
 #include "lwip/pbuf.h"
 
+#if !LWIP_LOWPOWER
+
 #if LWIP_DEBUG_TIMERNAMES
 #define HANDLER(x) x, #x
 #else /* LWIP_DEBUG_TIMERNAMES */
@@ -449,3 +451,4 @@ tcp_timer_needed(void)
 {
 }
 #endif /* LWIP_TIMERS && !LWIP_TIMERS_CUSTOM */
+#endif /* !LWIP_LOWPOWER */

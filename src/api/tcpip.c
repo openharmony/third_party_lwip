@@ -49,6 +49,9 @@
 #include "lwip/pbuf.h"
 #include "lwip/etharp.h"
 #include "netif/ethernet.h"
+#if LWIP_LOWPOWER
+#include "lwip/lowpower.h"
+#endif
 
 #define TCPIP_MSG_VAR_REF(name)     API_VAR_REF(name)
 #define TCPIP_MSG_VAR_DECLARE(name) API_VAR_DECLARE(struct tcpip_msg, name)
@@ -73,6 +76,7 @@ static void tcpip_thread_handle_msg(struct tcpip_msg *msg);
 #else /* !LWIP_TIMERS */
 /* wait for a message, timeouts are processed while waiting */
 #define TCPIP_MBOX_FETCH(mbox, msg) tcpip_timeouts_mbox_fetch(mbox, msg)
+#if !LWIP_LOWPOWER
 /**
  * Wait (forever) for a message to arrive in an mbox.
  * While waiting, timeouts are processed.
@@ -111,6 +115,7 @@ again:
     goto again;
   }
 }
+#endif /* !LWIP_LOWPOWER */
 #endif /* !LWIP_TIMERS */
 
 /**
@@ -201,13 +206,75 @@ tcpip_thread_handle_msg(struct tcpip_msg *msg)
       LWIP_DEBUGF(TCPIP_DEBUG, ("tcpip_thread: CALLBACK_STATIC %p\n", (void *)msg));
       msg->msg.cb.function(msg->msg.cb.ctx);
       break;
-
+#if LWIP_LOWPOWER
+    /* just wake up thread do nothing */
+    case TCPIP_MSG_NA:
+      if (msg->msg.lowpower.type == LOW_BLOCK) {
+        LOWPOWER_SIGNAL(msg->msg.lowpower.wait_up);
+      } else {
+        memp_free(MEMP_TCPIP_MSG_LOWPOWER, msg);
+      }
+      sys_timeout_set_wake_time(LOW_TMR_DELAY);
+      break;
+#endif
     default:
       LWIP_DEBUGF(TCPIP_DEBUG, ("tcpip_thread: invalid message: %d\n", msg->type));
       LWIP_ASSERT("tcpip_thread: invalid message", 0);
       break;
   }
 }
+
+#if LWIP_LOWPOWER
+/* send a na msg to wake up tcpip_thread */
+void
+tcpip_send_msg_na(enum lowpower_msg_type type)
+{
+  struct tcpip_msg *msg = NULL;
+  err_t val;
+
+  /* is not used lowpower mode */
+  if ((type != LOW_FORCE_NON_BLOCK) && (get_lowpowper_mod() == LOW_TMR_NORMAL_MOD)) {
+    return;
+  }
+  if (sys_timeout_waiting_long() == 0) {
+    return;
+  }
+
+  msg = (struct tcpip_msg *)memp_malloc(MEMP_TCPIP_MSG_LOWPOWER);
+  if (msg == NULL) {
+    LWIP_DEBUGF(LOWPOWER_DEBUG, ("tcpip_send_msg_na alloc faild\n"));
+    return;
+  }
+
+  /* just wake up thread if nonblock */
+  msg->type = TCPIP_MSG_NA;
+  msg->msg.lowpower.type = type;
+
+  if (type == LOW_BLOCK) {
+    LOWPOWER_SEM_NEW(msg->msg.lowpower.wait_up, val);
+    if (val != ERR_OK) {
+      LWIP_DEBUGF(LOWPOWER_DEBUG, ("alloc sem faild\n"));
+      memp_free(MEMP_TCPIP_MSG_LOWPOWER, msg);
+      return;
+    }
+  }
+
+  if (sys_mbox_trypost(&tcpip_mbox, msg) != ERR_OK) {
+    if (type == LOW_BLOCK) {
+      LOWPOWER_SEM_FREE(msg->msg.lowpower.wait_up);
+    }
+    memp_free(MEMP_TCPIP_MSG_LOWPOWER, msg);
+    LWIP_DEBUGF(LOWPOWER_DEBUG, ("tcpip_send_msg_na post faild\n"));
+    return;
+  }
+
+  if (type == LOW_BLOCK) {
+    LOWPOWER_SEM_WAIT(msg->msg.lowpower.wait_up);
+    LOWPOWER_SEM_FREE(msg->msg.lowpower.wait_up);
+    memp_free(MEMP_TCPIP_MSG_LOWPOWER, msg);
+  }
+}
+#endif /* LWIP_LOWPOWER */
 
 #ifdef TCPIP_THREAD_TEST
 /** Work on queued items in single-threaded test mode */
@@ -242,6 +309,9 @@ tcpip_inpkt(struct pbuf *p, struct netif *inp, netif_input_fn input_fn)
 #if LWIP_TCPIP_CORE_LOCKING_INPUT
   err_t ret;
   LWIP_DEBUGF(TCPIP_DEBUG, ("tcpip_inpkt: PACKET %p/%p\n", (void *)p, (void *)inp));
+#if LWIP_LOWPOWER
+  tcpip_send_msg_na(LOW_BLOCK);
+#endif
   LOCK_TCPIP_CORE();
   ret = input_fn(p, inp);
   UNLOCK_TCPIP_CORE();
@@ -438,6 +508,9 @@ tcpip_send_msg_wait_sem(tcpip_callback_fn fn, void *apimsg, sys_sem_t *sem)
 {
 #if LWIP_TCPIP_CORE_LOCKING
   LWIP_UNUSED_ARG(sem);
+#if LWIP_LOWPOWER
+  tcpip_send_msg_na(LOW_BLOCK);
+#endif
   LOCK_TCPIP_CORE();
   fn(apimsg);
   UNLOCK_TCPIP_CORE();
@@ -474,6 +547,9 @@ tcpip_api_call(tcpip_api_call_fn fn, struct tcpip_api_call_data *call)
 {
 #if LWIP_TCPIP_CORE_LOCKING
   err_t err;
+#if LWIP_LOWPOWER
+  tcpip_send_msg_na(LOW_BLOCK);
+#endif
   LOCK_TCPIP_CORE();
   err = fn(call);
   UNLOCK_TCPIP_CORE();

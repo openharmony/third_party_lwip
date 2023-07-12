@@ -407,6 +407,31 @@ dns_tmr(void)
   dns_check_entries();
 }
 
+#if LWIP_LOWPOWER
+#include "lwip/lowpower.h"
+u32_t
+dns_tmr_tick(void)
+{
+  u32_t tick = 0;
+  u32_t val;
+  s32_t i;
+
+  for (i = 0; i < DNS_TABLE_SIZE; i++) {
+    if ((dns_table[i].state == DNS_STATE_NEW) ||
+        (dns_table[i].state == DNS_STATE_ASKING)) {
+      LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s tmr tick: 1\n", "dns_tmr_tick"));
+      return 1;
+    }
+    if (dns_table[i].state == DNS_STATE_DONE) {
+      val = dns_table[i].ttl;
+      SET_TMR_TICK(tick, val);
+    }
+  }
+  LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s tmr tick: %u\n", "dns_tmr_tick", tick));
+  return tick;
+}
+#endif
+
 #if DNS_LOCAL_HOSTLIST
 static void
 dns_init_local(void)
