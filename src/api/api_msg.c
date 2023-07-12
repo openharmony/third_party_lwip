@@ -387,6 +387,35 @@ poll_tcp(void *arg, struct tcp_pcb *pcb)
   return ERR_OK;
 }
 
+#if LWIP_LOWPOWER
+/* check wether need to poll tcp */
+u8_t
+poll_tcp_needed(void *arg, struct tcp_pcb *pcb)
+{
+  struct netconn *conn = (struct netconn *)arg;
+  u8_t ret = 0;
+
+  LWIP_UNUSED_ARG(pcb);
+  if (conn == NULL) {
+    return 0;
+  }
+  if ((conn->state == NETCONN_WRITE) || (conn->state == NETCONN_CLOSE)) {
+    ret = 1;
+  }
+
+  /* Did a nonblocking write fail before? Then check available write-space. */
+  if ((conn->flags & NETCONN_FLAG_CHECK_WRITESPACE) != 0) {
+    /* If the queued byte- or pbuf-count drops below the configured low-water limit,
+       let select mark this pcb as writable again. */
+    if ((conn->pcb.tcp != NULL) && (tcp_sndbuf(conn->pcb.tcp) > TCP_SNDLOWAT) &&
+        (tcp_sndqueuelen(conn->pcb.tcp) < TCP_SNDQUEUELOWAT)) {
+      ret = 1;
+    }
+  }
+  return ret;
+}
+#endif /* LWIP_LOWPOWER */
+
 /**
  * Sent callback function for TCP netconns.
  * Signals the conn->sem and calls API_EVENT.

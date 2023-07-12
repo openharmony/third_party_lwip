@@ -467,6 +467,65 @@ dhcp_coarse_tmr(void)
   }
 }
 
+#if LWIP_LOWPOWER
+#include "lwip/lowpower.h"
+
+u32_t
+dhcp_coarse_tmr_tick(void)
+{
+  struct netif *netif;
+  u32_t tick = 0;
+  LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_coarse_tmr()\n"));
+  /* iterate through all network interfaces */
+#ifdef LOSCFG_NET_CONTAINER
+  NETIF_FOREACH(netif, get_root_net_group())
+#else
+  NETIF_FOREACH(netif)
+#endif
+  {
+    struct dhcp *dhcp = netif_dhcp_data(netif);
+    if ((dhcp != NULL) && (dhcp->state != DHCP_STATE_OFF)) {
+      if (dhcp->t0_timeout > 0) {
+        if (dhcp->t0_timeout > dhcp->lease_used) {
+          SET_TMR_TICK(tick, dhcp->t0_timeout - dhcp->lease_used);
+        } else {
+          SET_TMR_TICK(tick, 1);
+        }
+      }
+      if (dhcp->t2_rebind_time > 0) {
+        SET_TMR_TICK(tick, dhcp->t2_rebind_time);
+      }
+      if (dhcp->t1_renew_time > 0) {
+        SET_TMR_TICK(tick, dhcp->t1_renew_time);
+      }
+    }
+  }
+  return tick;
+}
+
+u32_t
+dhcp_fine_tmr_tick(void)
+{
+  struct netif *netif;
+  u32_t tick = 0;
+  /* loop through netif's */
+#ifdef LOSCFG_NET_CONTAINER
+  NETIF_FOREACH(netif, get_root_net_group())
+#else
+  NETIF_FOREACH(netif)
+#endif
+  {
+    struct dhcp *dhcp = netif_dhcp_data(netif);
+    if (dhcp != NULL) {
+      if (dhcp->request_timeout > 0) {
+        SET_TMR_TICK(tick, dhcp->request_timeout);
+      }
+    }
+  }
+  return tick;
+}
+#endif /* LWIP_LOWPOWER */
+
 /**
  * DHCP transaction timeout handling (this function must be called every 500ms,
  * see @ref DHCP_FINE_TIMER_MSECS).

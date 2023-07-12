@@ -137,6 +137,26 @@ ip6_reass_tmr(void)
    }
 }
 
+#if LWIP_LOWPOWER
+#include "lwip/lowpower.h"
+u32_t
+ip6_reass_tmr_tick(void)
+{
+  u32_t tick = 0;
+  u32_t val = 0;
+  struct ip6_reassdata *r = NULL;
+
+  r = reassdatagrams;
+  while (r != NULL) {
+    val = r->timer + 1;
+    SET_TMR_TICK(tick, val);
+    r = r->next;
+  }
+  LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s tmr tick: %u\n", "ip6_reass_tmr_tick", tick));
+  return tick;
+}
+#endif /* LWIP_LOWPOWER */
+
 /**
  * Free a datagram (struct ip6_reassdata) and all its pbufs.
  * Updates the total count of enqueued pbufs (ip6_reass_pbufcount),

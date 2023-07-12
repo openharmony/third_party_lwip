@@ -63,6 +63,9 @@
 #include "lwip/snmp.h"
 #include "netif/ieee802154.h"
 
+#if LWIP_LOWPOWER
+#include "lwip/lowpower.h"
+#endif
 #include <string.h>
 
 #if LWIP_6LOWPAN_802154_HW_CRC
@@ -117,6 +120,28 @@ static const struct lowpan6_link_addr ieee_802154_broadcast = {2, {0xff, 0xff}};
 #if LWIP_6LOWPAN_INFER_SHORT_ADDRESS
 static struct lowpan6_link_addr short_mac_addr = {2, {0, 0}};
 #endif /* LWIP_6LOWPAN_INFER_SHORT_ADDRESS */
+
+#if LWIP_LOWPOWER
+u32_t
+lowpan6_tmr_tick()
+{
+  struct lowpan6_reass_helper *lrh = NULL;
+  struct lowpan6_reass_helper *lrh_temp = NULL;
+  u32_t tick = 0;
+
+  lrh = lowpan6_data.reass_list;
+  while (lrh != NULL) {
+    lrh_temp = lrh->next_packet;
+    if (lrh->timer > 0) {
+      SET_TMR_TICK(tick, lrh->timer);
+    }
+    lrh = lrh_temp;
+  }
+
+  LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s tmr tick: %u\n", "lowpan6_tmr_tick", tick));
+  return tick;
+}
+#endif /* LWIP_LOWPOWER */
 
 /* IEEE 802.15.4 specific functions: */
 

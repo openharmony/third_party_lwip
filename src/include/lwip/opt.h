@@ -3523,4 +3523,38 @@
  * @}
  */
 
+/**
+ * enable LWIP_LOWPOWER macro to use lowpower function
+ */
+#undef LWIP_LOWPOWER
+#if LWIP_TIMERS && !LWIP_TIMERS_CUSTOM
+#if defined (CONFIG_LWIP_LOWPOWER)
+#define LWIP_LOWPOWER 1
+#else
+#define LWIP_LOWPOWER 0
+#endif
+#else
+#define LWIP_LOWPOWER 0
+#endif
+
+#if LWIP_LOWPOWER
+
+/**
+ * LOWPOWER_DEBUG: Enable debugging in lowpower.c.
+ */
+#if !defined LOWPOWER_DEBUG || defined __DOXYGEN__
+#define LOWPOWER_DEBUG                 LWIP_DBG_OFF
+#endif
+
+#ifndef MEMP_NUM_TCPIP_MSG_LOWPOWER
+#define MEMP_NUM_TCPIP_MSG_LOWPOWER 10
+#endif
+
+#define LWIP_SNTP_TIMER    2
+
+#define LOWPOWER_TCP_TIMER 1
+
+#define MEMP_NUM_SYS_TIMEOUT_LOW (MEMP_NUM_SYS_TIMEOUT + LWIP_SNTP_TIMER + LOWPOWER_TCP_TIMER)
+#endif /* LWIP_LOWPOWER */
+
 #endif /* LWIP_HDR_OPT_H */
