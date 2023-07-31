@@ -50,9 +50,6 @@
         <licensefile>COPYING</licensefile>
         <filefilterlist>
             <filefilter name="defaultFilter" desc="Files not to check">
-                <filteritem type="filename" name="*.c" desc="Lwip uses the BSD protocol, the copying notice in all files are the original code."/>
-                <filteritem type="filename" name="*.h" desc="Lwip uses the BSD protocol, the copying notice in all files are the original code."/>
-                <filteritem type="filename" name="*.bin" desc="Lwip uses the BSD protocol, the copying notice in all files are the original code."/>
                 <filteritem type="filename" name="*Doxyfile*" desc="doxy file, not license statement."/>
             </filefilter>
             <filefilter name="binaryFileTypePolicyFilter" desc="Filters for binary file policies">^M
