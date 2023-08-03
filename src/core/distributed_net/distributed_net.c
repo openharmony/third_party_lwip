@@ -27,7 +27,12 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "lwip/opt.h"
+#include "lwip/sockets.h"
+#include "lwip/priv/tcpip_priv.h"
+#include "lwip/priv/sockets_priv.h"
+#include "lwip/prot/dhcp.h"
+#include "lwip/dhcp.h"
+#include "lwip/if_api.h"
 
 #if LWIP_ENABLE_DISTRIBUTED_NET
 
