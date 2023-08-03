@@ -950,7 +950,9 @@ dns_send(u8_t idx)
 #else
       local_addr.addr = ipaddr_addr(LOCAL_SERVER_IP);
 #endif
-
+#if (defined(EMUI_WEB_CLIENT))
+      DISTRIBUTED_NET_START_UDP_SERVER();
+#endif
       err = udp_sendto(dns_pcbs[pcb_idx], p, &local_addr, dst_port);
     } else {
       err = udp_sendto(dns_pcbs[pcb_idx], p, dst, dst_port);
