@@ -27,7 +27,13 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "lwip/opt.h"
+#include "lwip/sockets.h"
+#include "lwip/priv/tcpip_priv.h"
+#include "lwip/priv/sockets_priv.h"
+#include "lwip/prot/dhcp.h"
+#include "lwip/dhcp.h"
+#include "lwip/if_api.h"
+#include <errno.h>
 
 #if LWIP_ENABLE_DISTRIBUTED_NET
 
@@ -51,8 +57,11 @@ int distributed_net_connect(int sock, const struct sockaddr *addr, socklen_t add
 
   (void)memset_s(&addr_in, sizeof(addr_in), 0, sizeof(addr_in));
   INIT_SOCK_ADDR(&addr_in, LOCAL_SERVER_IP, get_local_tcp_server_port());
+#if (defined(EMUI_WEB_CLIENT))
+  DISTRIBUTED_NET_START_TCP_SERVER();
+#endif
   if (lwip_connect_internal(sock, (struct sockaddr *)&addr_in, sizeof(addr_in)) < 0) {
-    if (get_errno() != EINPROGRESS) {
+    if (errno != EINPROGRESS) {
       return -1;
     }
   }
