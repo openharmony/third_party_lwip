@@ -48,6 +48,23 @@
 <configuration>
     <oatconfig>
         <licensefile>COPYING</licensefile>
+        <licensematcherlist>
+            <licensematcher name="BSD 3-Clause license" desc="如果工具扫描是InvalidLicense，可在此定义匹配规则，注意引号要转义">
+                <licensetext name='Redistribution and use in source' desc=""/>
+            </licensematcher>
+            <licensematcher name="BSD 3-Clause license" desc="如果工具扫描是InvalidLicense，可在此定义匹配规则，注意引号要转义">
+                <licensetext name='Non-exclusive rights to redistribute' desc=""/>
+            </licensematcher>
+            <licensematcher name="BSD 3-Clause license" desc="如果工具扫描是InvalidLicense，可在此定义匹配规则，注意引号要转义">
+                <licensetext name='Permission to use, copy, modify' desc=""/>
+            </licensematcher>
+        </licensematcherlist>
+        <policylist>
+            <policy name="defaultPolicy" desc="use lwip by independent process">
+                <policyitem type="compatibility" name="BSD 3-Clause license" path="src/include/netif/ppp/.*" rule="may" group="defaultGroup" filefilter="defaultPolicyFilter" desc="ppp相关功能不使用"/>
+                <policyitem type="compatibility" name="BSD 3-Clause license" path="src/netif/ppp/.*" rule="may" group="defaultGroup" filefilter="defaultPolicyFilter" desc="ppp相关功能不使用"/>
+            </policy>
+        </policylist>
         <filefilterlist>
             <filefilter name="defaultFilter" desc="Files not to check">
                 <filteritem type="filename" name="*Doxyfile*" desc="doxy file, not license statement."/>
