@@ -66,8 +66,12 @@
             </policy>
         </policylist>
         <filefilterlist>
+            <filefilter name="binaryFileTypePolicyFilter" desc="Filters for binary file policies">
+                <filteritem type="filename" name="lwip-2.1.3.tar.xz"/>
+            </filefilter>
             <filefilter name="defaultFilter" desc="Files not to check">
                 <filteritem type="filename" name="*Doxyfile*" desc="doxy file, not license statement."/>
+                <filteritem type="filepath" name="lwip.spec" desc="上游更新记录说明"/>
             </filefilter>
             <filefilter name="binaryFileTypePolicyFilter" desc="Filters for binary file policies">^M
                 <!--filteritem type="filename" name="*.uvwxyz" desc="Describe the reason for filtering scan results"/-->^M
