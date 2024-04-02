@@ -4,7 +4,7 @@
 Summary: lwip is a small independent implementation of the TCP/IP protocol suite
 Name:    lwip
 Version: 2.1.3
-Release: 90
+Release: 102
 License: BSD
 URL:     http://savannah.nongnu.org/projects/lwip/
 Source0: http://download.savannah.nongnu.org/releases/lwip/%{name}-%{version}.zip
@@ -101,6 +101,18 @@ Patch9083:  0084-add-tcpslowtmr-log-and-tcpfasttmr-cnt.patch
 Patch9084:  0085-add-lwip-log-tcp_rst-tcp_abandon-tcp_abort.patch
 Patch9085:  0086-log-add-errevent-log-and-tcp-exception-statistics.patch
 Patch9086:  0087-support-vlan-offload.patch
+Patch9087:  0088-modify-log-info-err.patch
+Patch9088:  0089-add-struct-gz-addr.patch
+Patch9089:  0090-frag-fix-coredump-when-get-netif.patch
+Patch9090:  0091-add-fd-log-info-and-fix-wrong-port-log-info.patch
+Patch9091:  0092-fix-the-coredump-issue-when-UDP-traffic-is-sent.patch
+Patch9092:  0093-modfiy-accept-null-pointer-when-new-conn-receive-RST-packet-in-listening.patch
+Patch9093:  0094-lwip-log-fix-reversed-port-in-tcp_input.patch
+Patch9094:  0095-event_callback-del-errevent-log-if-err-is-ERR_OK.patch
+Patch9095:  0096-tcp_send_fin-add-the-fin-to-the-last-unsent-segment.patch
+Patch9096:  0097-Mod-the-issue-that-2w-connection-unable-to-establish.patch
+Patch9097:  0098-remove-duplicate-lwip-log.patch
+Patch9098:  0099-fix-rte_ring_create-time-consuming.patch
 
 BuildRequires: gcc-c++ dos2unix dpdk-devel
 
@@ -131,6 +143,42 @@ cd %{_builddir}/%{name}-%{version}/src
 %{_libdir}/liblwip.a
 
 %changelog
+* Tue Dec 26 2023 jiangheng <jiangheng14@huawei.com> - 2.1.3-102
+- fix rte_ring_create/free time-consuming
+
+* Tue Dec 26 2023 jiangheng <jiangheng14@huawei.com> - 2.1.3-101
+- remove duplicate lwip log
+
+* Mon Dec 25 2023 hankangkang <hankangkang5@huawei.com> - 2.1.3-100
+- Mod the issue that 2w connection unable to establish
+
+* Sat Dec 23 2023 yangchen <yangchen145@huawei.com> - 2.1.3-99
+- tcp_send_fin: add the fin to the last unsent segment
+
+* Wed Dec 20 2023 yangchen <yangchen145@huawei.com> - 2.1.3-98
+- event_callback: del errevent log if err is ERR_OK
+
+* Fri Dec 15 2023 yangchen <yangchen145@huawei.com> - 2.1.3-97
+- lwip log: fix reversed port in tcp_input
+
+* Thu Dec 14 2023 hankangkang <hankangkang5@huawei.com> - 2.1.3-96
+- modfiy-accept-null-pointer-when-new-conn-receive-RST-packet-in-listening
+
+* Sat Dec 9 2023 wuchangye <wuchangye@huawei.com> - 2.1.3-95
+- fix the coredump issue when UDP traffic is sent
+
+* Fri Dec 8 2023 yangchen <yangchen145@huawei.com> - 2.1.3-94
+- add fd log info and fix wrong port log info
+
+* Fri Dec 8 2023 jiangheng <jiangheng14@huawei.com> - 2.1.3-93
+- ip4 frag: fix coredump when get netif
+
+* Wed Dec 6 2023 zhengjiebing <zhengjiebing@cmss.chinamobile.com> - 2.1.3-92
+- add struct gz_addr_t
+
+* Tue Dec 5  2023 hankangkang <hankangkang5@huawei.com> - 2.1.3-91
+- modify-log-info-err
+
 * Tue Nov 28 2023 zhengjiebing <zhengjiebing@cmss.chinamobile.com> - 2.1.3-90
 - support vlan offload
 
