@@ -167,12 +167,14 @@
 #else
 #define LWIP_DHCP_PROVIDE_DNS_SERVERS 0
 #endif
+#endif /* 0 */
 
 #ifndef LWIP_DHCP_INPUT_ERROR
 #define LWIP_DHCP_INPUT_ERROR(message, expression, handler) do { if (!(expression)) { \
   handler;} } while(0)
 #endif
 
+#if 0
 /** Option handling: options are parsed in dhcp_parse_reply
  * and saved in an array where other functions can load them from.
  * This might be moved into the struct dhcp (not necessarily since
