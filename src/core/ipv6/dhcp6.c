@@ -822,4 +822,29 @@ dhcp6_tmr(void)
   }
 }
 
+#if LWIP_LOWPOWER
+#include "lwip/lowpower.h"
+u32_t
+dhcp6_tmr_tick()
+{
+  struct netif *netif = NULL;
+  u32_t tick = 0;
+  /* loop through netif's */
+  #ifdef LOSCFG_NET_CONTAINER
+  NETIF_FOREACH(netif, get_root_net_group())
+#else
+  NETIF_FOREACH(netif)
+#endif
+  {
+    struct dhcp6 *dhcp6 = netif_dhcp6_data(netif);
+    /* only act on DHCPv6 configured interfaces */
+    if ((dhcp6 != NULL) && (dhcp6->request_timeout > 0)) {
+      SET_TMR_TICK(tick, dhcp6->request_timeout);
+    }
+  }
+  LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s tmr tick: %u\n", "dhcp6_tmr_tick", tick));
+  return tick;
+}
+#endif /* LWIP_LOWPOWER */
+
 #endif /* LWIP_IPV6 && LWIP_IPV6_DHCP6 */

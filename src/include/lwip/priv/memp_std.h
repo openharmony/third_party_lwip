@@ -99,7 +99,12 @@ LWIP_MEMPOOL(IGMP_GROUP,     MEMP_NUM_IGMP_GROUP,      sizeof(struct igmp_group)
 #endif /* LWIP_IGMP */
 
 #if LWIP_TIMERS && !LWIP_TIMERS_CUSTOM
+#if LWIP_LOWPOWER
+LWIP_MEMPOOL(SYS_TIMEOUT,    MEMP_NUM_SYS_TIMEOUT_LOW,     sizeof(struct timer_entry),      "SYS_TIMEOUT")
+LWIP_MEMPOOL(TCPIP_MSG_LOWPOWER, MEMP_NUM_TCPIP_MSG_LOWPOWER, sizeof(struct tcpip_msg),      "TCPIP_MSG_NA")
+#else
 LWIP_MEMPOOL(SYS_TIMEOUT,    MEMP_NUM_SYS_TIMEOUT,     sizeof(struct sys_timeo),      "SYS_TIMEOUT")
+#endif /* LWIP_LOWPOWER */
 #endif /* LWIP_TIMERS && !LWIP_TIMERS_CUSTOM */
 
 #if LWIP_DNS && LWIP_SOCKET

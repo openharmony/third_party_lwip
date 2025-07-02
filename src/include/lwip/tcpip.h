@@ -105,6 +105,10 @@ err_t  tcpip_untimeout(sys_timeout_handler h, void *arg);
 int tcpip_thread_poll_one(void);
 #endif
 
+#if LWIP_LOWPOWER
+void tcpip_send_msg_na(enum lowpower_msg_type type);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

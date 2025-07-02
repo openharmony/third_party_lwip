@@ -529,6 +529,35 @@ mld6_tmr(void)
   }
 }
 
+#if LWIP_LOWPOWER
+#include "lwip/lowpower.h"
+
+u32_t
+mld6_tmr_tick(void)
+{
+  struct netif *netif = NULL;
+  u32_t tick = 0;
+
+#ifdef LOSCFG_NET_CONTAINER
+  NETIF_FOREACH(netif, get_root_net_group())
+#else
+  NETIF_FOREACH(netif)
+#endif
+  {
+    struct mld_group *group = netif_mld6_data(netif);
+    while (group != NULL) {
+      if (group->timer > 0) {
+        SET_TMR_TICK(tick, group->timer);
+      }
+      group = group->next;
+    }
+  }
+
+  LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s tmr tick: %u\n", "mld6_tmr_tick", tick));
+  return tick;
+}
+#endif
+
 /**
  * Schedule a delayed membership report for a group
  *

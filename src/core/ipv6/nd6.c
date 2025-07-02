@@ -1182,6 +1182,106 @@ nd6_tmr(void)
 
 }
 
+#if LWIP_LOWPOWER
+#include "lwip/lowpower.h"
+u32_t
+nd6_tmr_tick(void)
+{
+  s8_t i;
+  struct netif *netif = NULL;
+  u32_t tick = 0;
+  u32_t val = 0;
+
+  for (i = 0; i < LWIP_ND6_NUM_NEIGHBORS; i++) {
+    switch (neighbor_cache[i].state) {
+      case ND6_PROBE:
+      case ND6_INCOMPLETE: /* state PROBE and INCOMPLETE return 1 */
+        return 1;
+      case ND6_REACHABLE:
+        /* Send queued packets, if any are left. Should have been sent already. */
+        if (neighbor_cache[i].q != NULL) {
+          return 1;
+        }
+        if (neighbor_cache[i].counter.reachable_time >= ND6_TMR_INTERVAL) {
+          val = neighbor_cache[i].counter.reachable_time / ND6_TMR_INTERVAL;
+          SET_TMR_TICK(tick, val);
+        }
+        break;
+      case ND6_DELAY:
+        val = neighbor_cache[i].counter.delay_time;
+        SET_TMR_TICK(tick, val);
+        break;
+      default:
+        /* Do nothing. */
+        break;
+    }
+  }
+
+  /* Process router entries. */
+  for (i = 0; i < LWIP_ND6_NUM_ROUTERS; i++) {
+    if (default_router_list[i].neighbor_entry != NULL) {
+      val = default_router_list[i].invalidation_timer;
+      SET_TMR_TICK(tick, val);
+    }
+  }
+
+  /* Process prefix entries. */
+  for (i = 0; i < LWIP_ND6_NUM_PREFIXES; i++) {
+    if (prefix_list[i].netif != NULL) {
+      val = prefix_list[i].invalidation_timer;
+      SET_TMR_TICK(tick, val);
+    }
+  }
+
+  /* Process our own addresses, updating address lifetimes and/or DAD state. */
+#ifdef LOSCFG_NET_CONTAINER
+  NETIF_FOREACH(netif, get_root_net_group())
+#else
+  NETIF_FOREACH(netif)
+#endif
+  {
+    for (i = 0; i < LWIP_IPV6_NUM_ADDRESSES; ++i) {
+      u8_t addr_state;
+#if LWIP_IPV6_ADDRESS_LIFETIMES
+      /* Step 1: update address lifetimes (valid and preferred). */
+      addr_state = netif_ip6_addr_state(netif, i);
+      if (!ip6_addr_isinvalid(addr_state) &&
+          !netif_ip6_addr_isstatic(netif, i)) {
+        u32_t life = netif_ip6_addr_valid_life(netif, i);
+        if (!ip6_addr_life_isinfinite(life)) {
+          SET_TMR_TICK(tick, life);
+        }
+
+        life = netif_ip6_addr_pref_life(netif, i);
+        if (!ip6_addr_life_isinfinite(life)) {
+          SET_TMR_TICK(tick, life);
+        }
+      }
+      /* The address state may now have changed, so reobtain it next. */
+#endif /* LWIP_IPV6_ADDRESS_LIFETIMES */
+      /* Step 2: update DAD state. */
+      addr_state = netif_ip6_addr_state(netif, i);
+      if (ip6_addr_istentative(addr_state)) {
+        LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s tmr tick: 1\n", "nd6_tmr_tick"));
+        return 1;
+      }
+    }
+  }
+
+  /* Router solicitations are sent in 4 second intervals (see RFC 4861, ch. 6.3.7) */
+  /* ND6_RTR_SOLICITATION_INTERVAL */
+#if LWIP_IPV6_SEND_ROUTER_SOLICIT
+  if (nd6_tmr_rs_reduction > 0) {
+    val = nd6_tmr_rs_reduction;
+    SET_TMR_TICK(tick, val);
+  }
+#endif /* LWIP_IPV6_SEND_ROUTER_SOLICIT */
+
+  LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s tmr tick: %u\n", "nd6_tmr_tick", tick));
+  return tick;
+}
+#endif /* LWIP_LOWPOWER */
+
 /** Send a neighbor solicitation message for a specific neighbor cache entry
  *
  * @param entry the neighbor cache entry for which to send the message
