@@ -54,6 +54,10 @@
 #include "lwip/netif.h"
 #include "lwip/priv/tcpip_priv.h"
 #include "lwip/mld6.h"
+#if LWIP_ENABLE_DISTRIBUTED_NET
+#include "lwip/distributed_net/distributed_net.h"
+#include "lwip/distributed_net/distributed_net_core.h"
+#endif /* LWIP_ENABLE_DISTRIBUTED_NET */
 #if LWIP_CHECKSUM_ON_COPY
 #include "lwip/inet_chksum.h"
 #endif
@@ -812,6 +816,17 @@ lwip_bind(int s, const struct sockaddr *name, socklen_t namelen)
 int
 lwip_close(int s)
 {
+#if LWIP_ENABLE_DISTRIBUTED_NET
+  if (!is_distributed_net_enabled()) {
+    return lwip_close_internal(s);
+  }
+  return distributed_net_close(s);
+}
+
+int
+lwip_close_internal(int s)
+{
+#endif
   struct lwip_sock *sock;
   int is_tcp = 0;
   err_t err;
@@ -853,6 +868,17 @@ lwip_close(int s)
 int
 lwip_connect(int s, const struct sockaddr *name, socklen_t namelen)
 {
+#if LWIP_ENABLE_DISTRIBUTED_NET
+  if (!is_distributed_net_enabled()) {
+    return lwip_connect_internal(s, name, namelen);
+  }
+  return distributed_net_connect(s, name, namelen);
+}
+
+int
+lwip_connect_internal(int s, const struct sockaddr *name, socklen_t namelen)
+{
+#endif
   struct lwip_sock *sock;
   err_t err;
 
@@ -1241,6 +1267,18 @@ ssize_t
 lwip_recvfrom(int s, void *mem, size_t len, int flags,
               struct sockaddr *from, socklen_t *fromlen)
 {
+#if LWIP_ENABLE_DISTRIBUTED_NET && LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
+  if (!is_distributed_net_enabled()) {
+    return lwip_recvfrom_internal(s, mem, len, flags, from, fromlen);
+  }
+  return distributed_net_recvfrom(s, mem, len, flags, from, fromlen);
+}
+
+ssize_t
+lwip_recvfrom_internal(int s, void *mem, size_t len, int flags,
+                       struct sockaddr *from, socklen_t *fromlen)
+{
+#endif
   struct lwip_sock *sock;
   ssize_t ret;
 
@@ -1439,7 +1477,11 @@ lwip_send(int s, const void *data, size_t size, int flags)
   if (NETCONNTYPE_GROUP(netconn_type(sock->conn)) != NETCONN_TCP) {
 #if (LWIP_UDP || LWIP_RAW)
     done_socket(sock);
+#if LWIP_ENABLE_DISTRIBUTED_NET && LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
+    return lwip_sendto_internal(s, data, size, flags, NULL, 0);
+#else
     return lwip_sendto(s, data, size, flags, NULL, 0);
+#endif
 #else /* (LWIP_UDP || LWIP_RAW) */
     set_errno(err_to_errno(ERR_ARG));
     done_socket(sock);
@@ -1463,6 +1505,17 @@ lwip_send(int s, const void *data, size_t size, int flags)
 ssize_t
 lwip_sendmsg(int s, const struct msghdr *msg, int flags)
 {
+#if LWIP_ENABLE_DISTRIBUTED_NET && LWIP_USE_GET_HOST_BY_NAME_EXTERNAL && LWIP_DISTRIBUTED_NET_ENABLE_SENDMSG
+  if (!is_distributed_net_enabled()) {
+    return lwip_sendmsg_internal(s, msg, flags);
+  }
+  return distributed_net_sendmsg(s, msg, flags);
+}
+
+ssize_t
+lwip_sendmsg_internal(int s, const struct msghdr *msg, int flags)
+{
+#endif
   struct lwip_sock *sock;
 #if LWIP_TCP
   u8_t write_flags;
@@ -1627,6 +1680,18 @@ ssize_t
 lwip_sendto(int s, const void *data, size_t size, int flags,
             const struct sockaddr *to, socklen_t tolen)
 {
+#if LWIP_ENABLE_DISTRIBUTED_NET && LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
+  if (!is_distributed_net_enabled()) {
+    return lwip_sendto_internal(s, data, size, flags, to, tolen);
+  }
+  return distributed_net_sendto(s, data, size, flags, to, tolen);
+}
+
+ssize_t
+lwip_sendto_internal(int s, const void *data, size_t size, int flags,
+                     const struct sockaddr *to, socklen_t tolen)
+{
+#endif
   struct lwip_sock *sock;
   err_t err;
   u16_t short_size;

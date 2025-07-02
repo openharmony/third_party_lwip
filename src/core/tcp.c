@@ -156,7 +156,7 @@ static const char *const tcp_state_str[] = {
 };
 
 /* last local TCP port */
-static u16_t tcp_port = TCP_LOCAL_PORT_RANGE_START;
+static volatile u16_t tcp_port = TCP_LOCAL_PORT_RANGE_START;
 
 /* Incremented every coarse grained timer shot (typically every 500 ms). */
 u32_t tcp_ticks;
