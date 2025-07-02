@@ -86,6 +86,11 @@
 
 #include "lwip/opt.h"
 
+#if LWIP_ENABLE_DISTRIBUTED_NET && !LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
+#include "lwip/distributed_net/distributed_net.h"
+#include "lwip/distributed_net/udp_transmit.h"
+#endif
+
 #if LWIP_DNS /* don't build if not configured for use in lwipopts.h */
 
 #include "lwip/def.h"
@@ -797,8 +802,18 @@ dns_send(u8_t idx)
   }
 
   /* if here, we have either a new query or a retry on a previous query to process */
+#if LWIP_ENABLE_DISTRIBUTED_NET && !LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
+  if (is_distributed_net_enabled()) {
+    p = pbuf_alloc(PBUF_TRANSPORT,
+                   (u16_t)(sizeof(udp_data) + SIZEOF_DNS_HDR + strlen(entry->name) + 2 + SIZEOF_DNS_QUERY), PBUF_RAM);
+  } else {
+    p = pbuf_alloc(PBUF_TRANSPORT, (u16_t)(SIZEOF_DNS_HDR + strlen(entry->name) + 2 + SIZEOF_DNS_QUERY), PBUF_RAM);
+  }
+#else
   p = pbuf_alloc(PBUF_TRANSPORT, (u16_t)(SIZEOF_DNS_HDR + strlen(entry->name) + 2 +
                                          SIZEOF_DNS_QUERY), PBUF_RAM);
+#endif
+
   if (p != NULL) {
     const ip_addr_t *dst;
     u16_t dst_port;
@@ -807,12 +822,41 @@ dns_send(u8_t idx)
     hdr.id = lwip_htons(entry->txid);
     hdr.flags1 = DNS_FLAG1_RD;
     hdr.numquestions = PP_HTONS(1);
+#if LWIP_ENABLE_DISTRIBUTED_NET && !LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
+    if (is_distributed_net_enabled()) {
+      udp_data udp_data_hdr = {0};
+      (void)memset_s(&udp_data_hdr, sizeof(udp_data_hdr), 0, sizeof(udp_data_hdr));
+      dst = &dns_servers[entry->server_idx];
+
+#if LWIP_IPV6
+      (void)strcpy_s(udp_data_hdr.dest_addr, sizeof(udp_data_hdr.dest_addr), ip4addr_ntoa(&dst->u_addr.ip4));
+#else
+      (void)strcpy_s(udp_data_hdr.dest_addr, sizeof(udp_data_hdr.dest_addr), ip4addr_ntoa(dst));
+#endif
+
+      udp_data_hdr.dest_port = DNS_SERVER_PORT;
+
+      pbuf_take(p, &udp_data_hdr, sizeof(udp_data_hdr));
+      pbuf_take_at(p, &hdr, SIZEOF_DNS_HDR, sizeof(udp_data_hdr));
+    } else {
+      pbuf_take(p, &hdr, SIZEOF_DNS_HDR);
+    }
+#else
     pbuf_take(p, &hdr, SIZEOF_DNS_HDR);
+#endif
     hostname = entry->name;
     --hostname;
 
     /* convert hostname into suitable query format. */
+#if LWIP_ENABLE_DISTRIBUTED_NET && !LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
+    if (is_distributed_net_enabled()) {
+      query_idx = sizeof(udp_data) + SIZEOF_DNS_HDR;
+    } else {
+      query_idx = SIZEOF_DNS_HDR;
+    }
+#else
     query_idx = SIZEOF_DNS_HDR;
+#endif
     do {
       ++hostname;
       hostname_part = hostname;
@@ -870,7 +914,25 @@ dns_send(u8_t idx)
       dst_port = DNS_SERVER_PORT;
       dst = &dns_servers[entry->server_idx];
     }
+#if LWIP_ENABLE_DISTRIBUTED_NET && !LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
+    if (is_distributed_net_enabled()) {
+      ip_addr_t local_addr = {0};
+      dst_port = get_local_udp_server_port();
+
+#if LWIP_IPV6
+      local_addr.u_addr.ip4.addr = ipaddr_addr(LOCAL_SERVER_IP);
+      local_addr.type = IPADDR_TYPE_V4;
+#else
+      local_addr.addr = ipaddr_addr(LOCAL_SERVER_IP);
+#endif
+
+      err = udp_sendto(dns_pcbs[pcb_idx], p, &local_addr, dst_port);
+    } else {
+      err = udp_sendto(dns_pcbs[pcb_idx], p, dst, dst_port);
+    }
+#else
     err = udp_sendto(dns_pcbs[pcb_idx], p, dst, dst_port);
+#endif
 
     /* free pbuf */
     pbuf_free(p);
@@ -1241,9 +1303,28 @@ dns_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr, 
         {
           /* Check whether response comes from the same network address to which the
              question was sent. (RFC 5452) */
+#if LWIP_ENABLE_DISTRIBUTED_NET && !LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
+          if (is_distributed_net_enabled()) {
+#if LWIP_IPV6
+            if (addr->type != IPADDR_TYPE_V4 || addr->u_addr.ip4.addr != ipaddr_addr(LOCAL_SERVER_IP) ||
+                port != get_local_udp_server_port()) {
+              goto ignore_packet; /* ignore this packet */
+            }
+#else
+            if (addr->addr != ipaddr_addr(LOCAL_SERVER_IP) || port != get_local_udp_server_port()) {
+              goto ignore_packet; /* ignore this packet */
+            }
+#endif
+          } else {
+            if (!ip_addr_eq(addr, &dns_servers[entry->server_idx])) {
+              goto ignore_packet; /* ignore this packet */
+            }
+          }
+#else
           if (!ip_addr_eq(addr, &dns_servers[entry->server_idx])) {
             goto ignore_packet; /* ignore this packet */
           }
+#endif
         }
 
         /* Check if the name in the "question" part match with the name in the entry and
