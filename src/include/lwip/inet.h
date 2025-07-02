@@ -53,7 +53,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
+#ifndef LWIP_SOCKET_STDINCLUDE
 /* If your port already typedef's in_addr_t, define IN_ADDR_T_DEFINED
    to prevent this code from redefining it. */
 #if !defined(in_addr_t) && !defined(IN_ADDR_T_DEFINED)
@@ -177,7 +177,7 @@ extern const struct in6_addr in6addr_any;
 #define inet6_ntoa_r(addr, buf, buflen) ip6addr_ntoa_r((const ip6_addr_t*)&(addr), buf, buflen)
 
 #endif /* LWIP_IPV6 */
-
+#endif /* LWIP_SOCKET_STDINCLUDE */
 
 #ifdef __cplusplus
 }

@@ -61,7 +61,7 @@ extern "C" {
 
 /* sockaddr and pals include length fields */
 #define LWIP_SOCKET_HAVE_SA_LEN  1
-
+#ifndef LWIP_SOCKET_STDINCLUDE
 /* If your port already typedef's sa_family_t, define SA_FAMILY_T_DEFINED
    to prevent this code from redefining it. */
 #if !defined(sa_family_t) && !defined(SA_FAMILY_T_DEFINED)
@@ -130,9 +130,11 @@ struct iovec {
   size_t iov_len;
 };
 #endif
+#endif /*LWIP_SOCKET_STDINCLUDE */
 
 typedef int msg_iovlen_t;
 
+#ifndef LWIP_SOCKET_STDINCLUDE
 struct msghdr {
   void         *msg_name;
   socklen_t     msg_namelen;
@@ -533,7 +535,7 @@ struct timeval {
   long    tv_usec;        /* and microseconds */
 };
 #endif /* LWIP_TIMEVAL_PRIVATE */
-
+#endif /* LWIP_SOCKET_STDINCLUDE */
 #ifdef __cplusplus
 }
 #endif
