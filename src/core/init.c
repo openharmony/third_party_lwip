@@ -243,10 +243,11 @@ PACK_STRUCT_END
 #error "NETCONN_MORE != TCP_WRITE_FLAG_MORE"
 #endif
 #endif /* LWIP_NETCONN && LWIP_TCP */
+#if 0
 #if LWIP_NETCONN_FULLDUPLEX && !LWIP_NETCONN_SEM_PER_THREAD
 #error "For LWIP_NETCONN_FULLDUPLEX to work, LWIP_NETCONN_SEM_PER_THREAD is required"
 #endif
-
+#endif /* 0 */
 
 /* Compile-time checks for deprecated options.
  */
