@@ -124,6 +124,9 @@ enum tcpip_msg_type {
 #endif /* LWIP_TCPIP_TIMEOUT && LWIP_TIMERS */
   TCPIP_MSG_CALLBACK,
   TCPIP_MSG_CALLBACK_STATIC,
+#if LWIP_LOWPOWER
+  TCPIP_MSG_NA,
+#endif /* LWIP_LOWPOWER */
   TCPIP_MSG_CALLBACK_STATIC_WAIT
 };
 
@@ -164,6 +167,12 @@ struct tcpip_msg {
       void *arg;
     } tmo;
 #endif /* LWIP_TCPIP_TIMEOUT && LWIP_TIMERS */
+#if LWIP_LOWPOWER
+    struct {
+      enum lowpower_msg_type type;
+      lowpower_sem_t wait_up;
+    } lowpower;
+#endif
   } msg;
 };
 

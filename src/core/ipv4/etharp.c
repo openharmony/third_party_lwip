@@ -188,6 +188,35 @@ etharp_free_entry(int i)
 #endif /* LWIP_DEBUG */
 }
 
+#if LWIP_LOWPOWER
+#include "lwip/lowpower.h"
+u32_t
+etharp_tmr_tick(void)
+{
+  s32_t i;
+  u32_t tick = 0;
+  u32_t time;
+
+  for (i = 0; i < ARP_TABLE_SIZE; i++) {
+    u8_t state = arp_table[i].state;
+    if ((state != ETHARP_STATE_EMPTY)
+#if ETHARP_SUPPORT_STATIC_ENTRIES
+        && (state != ETHARP_STATE_STATIC)
+#endif /* ETHARP_SUPPORT_STATIC_ENTRIES */
+       ) {
+      if (arp_table[i].state != ETHARP_STATE_STABLE) {
+        LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s tmr tick: 1\n", "etharp_tmr_tick"));
+        return 1;
+      }
+      time = (u32_t)ARP_MAXAGE - arp_table[i].ctime;
+      SET_TMR_TICK(tick, time);
+    }
+  }
+  LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s tmr tick: %u\n", "etharp_tmr_tick", tick));
+  return tick;
+}
+#endif /* LWIP_LOWPOWER */
+
 /**
  * Clears expired entries in the ARP table.
  *

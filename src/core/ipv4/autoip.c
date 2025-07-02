@@ -330,6 +330,29 @@ autoip_network_changed_link_down(struct netif *netif)
   }
 }
 
+#if LWIP_LOWPOWER
+#include "lwip/lowpower.h"
+u32_t
+autoip_tmr_tick(void)
+{
+  struct netif *netif = NULL;
+  u32_t tick = 0;
+  NETIF_FOREACH(netif) {
+    struct autoip *autoip = netif_autoip_data(netif);
+    if ((autoip != NULL) && (autoip->ttw > 0)) {
+      if ((autoip->state == AUTOIP_STATE_PROBING) ||
+          (autoip->state == AUTOIP_STATE_ANNOUNCING)) {
+        SET_TMR_TICK(tick, autoip->ttw);
+      }
+    }
+  }
+
+  LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s tmr tick: %u\n", "autoip_tmr_tick", tick));
+  return tick;
+}
+
+#endif
+
 /**
  * @ingroup autoip
  * Stop AutoIP client

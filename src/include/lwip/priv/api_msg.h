@@ -187,6 +187,11 @@ struct dns_api_msg {
 };
 #endif /* LWIP_DNS */
 
+#if LWIP_LOWPOWER
+/* check wether need to poll tcp */
+u8_t poll_tcp_needed(void *arg, struct tcp_pcb *pcb);
+#endif
+
 #if LWIP_NETCONN_FULLDUPLEX
 int lwip_netconn_is_deallocated_msg(void *msg);
 #endif
@@ -260,6 +265,11 @@ struct netifapi_msg {
 #endif /* LWIP_MPU_COMPATIBLE */
       u8_t index;
     } ifs;
+#if LWIP_LOWPOWER
+    struct {
+      enum lowpower_mod mod;
+    } lp;
+#endif
   } msg;
 };
 

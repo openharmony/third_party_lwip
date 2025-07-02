@@ -668,6 +668,32 @@ igmp_tmr(void)
   }
 }
 
+#if LWIP_LOWPOWER
+#include "lwip/lowpower.h"
+u32_t
+igmp_tmr_tick(void)
+{
+  struct netif *netif = NULL;
+  u32_t tick = 0;
+#ifdef LOSCFG_NET_CONTAINER
+  NETIF_FOREACH(netif, get_root_net_group())
+#else
+  NETIF_FOREACH(netif)
+#endif
+  {
+    struct igmp_group *group = netif_igmp_data(netif);
+    while (group != NULL) {
+      if (group->timer > 0) {
+        SET_TMR_TICK(tick, group->timer);
+      }
+      group = group->next;
+    }
+  }
+  LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s tmr tick: %u\n", "igmp_tmr_tick", tick));
+  return tick;
+}
+#endif
+
 /**
  * Called if a timeout for one group is reached.
  * Sends a report for this group.

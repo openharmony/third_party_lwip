@@ -424,6 +424,11 @@ void             tcp_accept  (struct tcp_pcb *pcb, tcp_accept_fn accept);
 #endif /* LWIP_CALLBACK_API */
 void             tcp_poll    (struct tcp_pcb *pcb, tcp_poll_fn poll, u8_t interval);
 
+#if LWIP_LOWPOWER
+u32_t tcp_fast_tmr_tick(void);
+u32_t tcp_slow_tmr_tick(void);
+#endif
+
 #define          tcp_set_flags(pcb, set_flags)     do { (pcb)->flags = (tcpflags_t)((pcb)->flags |  (set_flags)); } while(0)
 #define          tcp_clear_flags(pcb, clr_flags)   do { (pcb)->flags = (tcpflags_t)((pcb)->flags & (tcpflags_t)(~(clr_flags) & TCP_ALLFLAGS)); } while(0)
 #define          tcp_is_flag_set(pcb, flag)        (((pcb)->flags & (flag)) != 0)
