@@ -568,6 +568,7 @@ alloc_socket(struct netconn *newconn, int accepted)
        * (unless it has been created by accept()). */
       sockets[i].sendevent  = (NETCONNTYPE_GROUP(newconn->type) == NETCONN_TCP ? (accepted != 0) : 1);
       sockets[i].errevent   = 0;
+      init_waitqueue_head(&sockets[i].wq);
 #endif /* LWIP_SOCKET_SELECT || LWIP_SOCKET_POLL */
       return i + LWIP_SOCKET_OFFSET;
     }
@@ -1081,6 +1082,7 @@ lwip_sock_make_addr(struct netconn *conn, ip_addr_t *fromaddr, u16_t port,
 #endif /* LWIP_IPV4 && LWIP_IPV6 */
 
   IPADDR_PORT_TO_SOCKADDR(&saddr, fromaddr, port);
+  DF_NADDR(*fromaddr);
   if (*fromlen < IPADDR_SOCKADDR_GET_LEN(&saddr)) {
     truncated = 1;
   } else if (*fromlen > IPADDR_SOCKADDR_GET_LEN(&saddr)) {
@@ -1109,11 +1111,11 @@ lwip_recv_tcp_from(struct lwip_sock *sock, struct sockaddr *from, socklen_t *fro
     /* get remote addr/port from tcp_pcb */
     u16_t port;
     ip_addr_t tmpaddr;
-    netconn_getaddr(sock->conn, &tmpaddr, &port, 0);
+    err_t err = netconn_getaddr(sock->conn, &tmpaddr, &port, 0);
     LWIP_DEBUGF(SOCKETS_DEBUG, ("%s(%d):  addr=", dbg_fn, dbg_s));
     ip_addr_debug_print_val(SOCKETS_DEBUG, tmpaddr);
     LWIP_DEBUGF(SOCKETS_DEBUG, (" port=%"U16_F" len=%d\n", port, (int)dbg_ret));
-    if (from && fromlen) {
+    if (!err && from && fromlen) {
       return lwip_sock_make_addr(sock->conn, &tmpaddr, port, from, fromlen);
     }
   }
@@ -2604,6 +2606,7 @@ event_callback(struct netconn *conn, enum netconn_evt evt, u16_t len)
   } else {
     SYS_ARCH_UNPROTECT(lev);
   }
+  poll_check_waiters(s, check_waiters);
   done_socket(sock);
 }
 
@@ -3903,6 +3906,7 @@ lwip_ioctl(int s, long cmd, void *argp)
       return 0;
 
     default:
+      IOCTL_CMD_CASE_HANDLER();
       break;
   } /* switch (cmd) */
   LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_ioctl(%d, UNIMPL: 0x%lx, %p)\n", s, cmd, argp));
