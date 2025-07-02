@@ -5,12 +5,12 @@
  * @defgroup mld6 MLD6
  * @ingroup ip6
  * Multicast listener discovery for IPv6. Aims to be compliant with RFC 2710.
- * No support for MLDv2.\n
- * Note: The allnodes (ff01::1, ff02::1) group is assumed be received by your 
+ * No support for MLDv2.<br>
+ * Note: The allnodes (ff01::1, ff02::1) group is assumed be received by your
  * netif since it must always be received for correct IPv6 operation (e.g. SLAAC).
- * Ensure the netif filters are configured accordingly!\n
+ * Ensure the netif filters are configured accordingly!<br>
  * The netif flags also need NETIF_FLAG_MLD6 flag set to enable MLD6 on a
- * netif ("netif->flags |= NETIF_FLAG_MLD6;").\n
+ * netif ("netif->flags |= NETIF_FLAG_MLD6;").<br>
  * To be called from TCPIP thread.
  */
 
@@ -146,7 +146,7 @@ mld6_lookfor_group(struct netif *ifp, const ip6_addr_t *addr)
   struct mld_group *group = netif_mld6_data(ifp);
 
   while (group != NULL) {
-    if (ip6_addr_cmp(&(group->group_address), addr)) {
+    if (ip6_addr_eq(&(group->group_address), addr)) {
       return group;
     }
     group = group->next;
@@ -320,11 +320,7 @@ mld6_joingroup(const ip6_addr_t *srcaddr, const ip6_addr_t *groupaddr)
   LWIP_ASSERT_CORE_LOCKED();
 
   /* loop through netif's */
-#ifdef LOSCFG_NET_CONTAINER
-  NETIF_FOREACH(netif, get_root_net_group()) {
-#else
   NETIF_FOREACH(netif) {
-#endif
     /* Should we join this interface ? */
     if (ip6_addr_isany(srcaddr) ||
         netif_get_ip6_addr_match(netif, srcaddr) >= 0) {
@@ -413,11 +409,7 @@ mld6_leavegroup(const ip6_addr_t *srcaddr, const ip6_addr_t *groupaddr)
   LWIP_ASSERT_CORE_LOCKED();
 
   /* loop through netif's */
-#ifdef LOSCFG_NET_CONTAINER
-  NETIF_FOREACH(netif, get_root_net_group()) {
-#else
   NETIF_FOREACH(netif) {
-#endif
     /* Should we leave this interface ? */
     if (ip6_addr_isany(srcaddr) ||
         netif_get_ip6_addr_match(netif, srcaddr) >= 0) {
@@ -505,11 +497,7 @@ mld6_tmr(void)
 {
   struct netif *netif;
 
-#ifdef LOSCFG_NET_CONTAINER
-  NETIF_FOREACH(netif, get_root_net_group()) {
-#else
   NETIF_FOREACH(netif) {
-#endif
     struct mld_group *group = netif_mld6_data(netif);
 
     while (group != NULL) {
@@ -528,35 +516,6 @@ mld6_tmr(void)
     }
   }
 }
-
-#if LWIP_LOWPOWER
-#include "lwip/lowpower.h"
-
-u32_t
-mld6_tmr_tick(void)
-{
-  struct netif *netif = NULL;
-  u32_t tick = 0;
-
-#ifdef LOSCFG_NET_CONTAINER
-  NETIF_FOREACH(netif, get_root_net_group())
-#else
-  NETIF_FOREACH(netif)
-#endif
-  {
-    struct mld_group *group = netif_mld6_data(netif);
-    while (group != NULL) {
-      if (group->timer > 0) {
-        SET_TMR_TICK(tick, group->timer);
-      }
-      group = group->next;
-    }
-  }
-
-  LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s tmr tick: %u\n", "mld6_tmr_tick", tick));
-  return tick;
-}
-#endif
 
 /**
  * Schedule a delayed membership report for a group

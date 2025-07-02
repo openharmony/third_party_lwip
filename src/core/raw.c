@@ -2,14 +2,14 @@
  * @file
  * Implementation of raw protocol PCBs for low-level handling of
  * different types of protocols besides (or overriding) those
- * already available in lwIP.\n
+ * already available in lwIP.<br>
  * See also @ref raw_raw
  *
  * @defgroup raw_raw RAW
  * @ingroup callbackstyle_api
  * Implementation of raw protocol PCBs for low-level handling of
  * different types of protocols besides (or overriding) those
- * already available in lwIP.\n
+ * already available in lwIP.<br>
  * @see @ref api
  */
 
@@ -106,7 +106,7 @@ raw_input_local_match(struct raw_pcb *pcb, u8_t broadcast)
 #endif /* LWIP_IPV4 */
       /* Handle IPv4 and IPv6: catch all or exact match */
       if (ip_addr_isany(&pcb->local_ip) ||
-          ip_addr_cmp(&pcb->local_ip, ip_current_dest_addr())) {
+          ip_addr_eq(&pcb->local_ip, ip_current_dest_addr())) {
         return 1;
       }
   }
@@ -135,9 +135,6 @@ raw_input_state_t
 raw_input(struct pbuf *p, struct netif *inp)
 {
   struct raw_pcb *pcb, *prev;
-#ifdef LOSCFG_NET_CONTAINER
-  struct net_group *inp_net_group = get_net_group_from_netif(inp);
-#endif
   s16_t proto;
   raw_input_state_t ret = RAW_INPUT_NONE;
   u8_t broadcast = ip_addr_isbroadcast(ip_current_dest_addr(), ip_current_netif());
@@ -167,14 +164,9 @@ raw_input(struct pbuf *p, struct netif *inp)
   /* loop through all raw pcbs until the packet is eaten by one */
   /* this allows multiple pcbs to match against the packet by design */
   while (pcb != NULL) {
-#ifdef LOSCFG_NET_CONTAINER
-    if (inp_net_group == get_net_group_from_raw_pcb(pcb) &&
-        (pcb->protocol == proto) && raw_input_local_match(pcb, broadcast) &&
-#else
     if ((pcb->protocol == proto) && raw_input_local_match(pcb, broadcast) &&
-#endif
         (((pcb->flags & RAW_FLAGS_CONNECTED) == 0) ||
-         ip_addr_cmp(&pcb->remote_ip, ip_current_src_addr()))) {
+         ip_addr_eq(&pcb->remote_ip, ip_current_src_addr()))) {
       /* receive callback function available? */
       if (pcb->recv != NULL) {
         u8_t eaten;
@@ -370,15 +362,8 @@ raw_sendto(struct raw_pcb *pcb, struct pbuf *p, const ip_addr_t *ipaddr)
 
   LWIP_DEBUGF(RAW_DEBUG | LWIP_DBG_TRACE, ("raw_sendto\n"));
 
-#ifdef LOSCFG_NET_CONTAINER
-  struct net_group *group = get_net_group_from_raw_pcb(pcb);
-#endif
   if (pcb->netif_idx != NETIF_NO_INDEX) {
-#ifdef LOSCFG_NET_CONTAINER
-    netif = netif_get_by_index(pcb->netif_idx, group);
-#else
     netif = netif_get_by_index(pcb->netif_idx);
-#endif
   } else {
 #if LWIP_MULTICAST_TX_OPTIONS
     netif = NULL;
@@ -386,27 +371,20 @@ raw_sendto(struct raw_pcb *pcb, struct pbuf *p, const ip_addr_t *ipaddr)
       /* For multicast-destined packets, use the user-provided interface index to
        * determine the outgoing interface, if an interface index is set and a
        * matching netif can be found. Otherwise, fall back to regular routing. */
-#ifdef LOSCFG_NET_CONTAINER
-      netif = netif_get_by_index(pcb->mcast_ifindex, group);
-#else
       netif = netif_get_by_index(pcb->mcast_ifindex);
-#endif
     }
 
     if (netif == NULL)
 #endif /* LWIP_MULTICAST_TX_OPTIONS */
     {
-#ifdef LOSCFG_NET_CONTAINER
-      netif = ip_route(&pcb->local_ip, ipaddr, group);
-#else
       netif = ip_route(&pcb->local_ip, ipaddr);
-#endif
     }
   }
 
   if (netif == NULL) {
     LWIP_DEBUGF(RAW_DEBUG | LWIP_DBG_LEVEL_WARNING, ("raw_sendto: No route to "));
     ip_addr_debug_print(RAW_DEBUG | LWIP_DBG_LEVEL_WARNING, ipaddr);
+    LWIP_DEBUGF(RAW_DEBUG | LWIP_DBG_LEVEL_WARNING, ("\n"));
     return ERR_RTE;
   }
 
@@ -603,16 +581,6 @@ raw_remove(struct raw_pcb *pcb)
   memp_free(MEMP_RAW_PCB, pcb);
 }
 
-#ifdef LOSCFG_NET_CONTAINER
-void set_raw_pcb_net_group(struct raw_pcb *pcb, struct net_group *group)
-{
-  set_ippcb_net_group((struct ip_pcb *)pcb, group);
-}
-
-struct net_group *get_net_group_from_raw_pcb(struct raw_pcb *pcb) {
-  return get_net_group_from_ippcb((struct ip_pcb *)pcb);
-}
-#endif
 /**
  * @ingroup raw_raw
  * Create a RAW PCB.
@@ -642,6 +610,7 @@ raw_new(u8_t proto)
 #if LWIP_MULTICAST_TX_OPTIONS
     raw_set_multicast_ttl(pcb, RAW_TTL);
 #endif /* LWIP_MULTICAST_TX_OPTIONS */
+    pcb_tci_init(pcb);
     pcb->next = raw_pcbs;
     raw_pcbs = pcb;
   }
@@ -692,7 +661,7 @@ void raw_netif_ip_addr_changed(const ip_addr_t *old_addr, const ip_addr_t *new_a
   if (!ip_addr_isany(old_addr) && !ip_addr_isany(new_addr)) {
     for (rpcb = raw_pcbs; rpcb != NULL; rpcb = rpcb->next) {
       /* PCB bound to current local interface address? */
-      if (ip_addr_cmp(&rpcb->local_ip, old_addr)) {
+      if (ip_addr_eq(&rpcb->local_ip, old_addr)) {
         /* The PCB is bound to the old ipaddr and
          * is set to bound to the new one instead */
         ip_addr_copy(rpcb->local_ip, *new_addr);

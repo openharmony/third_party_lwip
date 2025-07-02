@@ -54,10 +54,6 @@
 #include "lwip/netif.h"
 #include "lwip/priv/tcpip_priv.h"
 #include "lwip/mld6.h"
-#if LWIP_ENABLE_DISTRIBUTED_NET
-#include "lwip/distributed_net/distributed_net.h"
-#include "lwip/distributed_net/distributed_net_core.h"
-#endif /* LWIP_ENABLE_DISTRIBUTED_NET */
 #if LWIP_CHECKSUM_ON_COPY
 #include "lwip/inet_chksum.h"
 #endif
@@ -70,10 +66,6 @@
 
 #ifdef LWIP_HOOK_FILENAME
 #include LWIP_HOOK_FILENAME
-#endif
-
-#if LWIP_LOWPOWER
-#include "lwip/lowpower.h"
 #endif
 
 /* If the netconn API is not required publicly, then we include the necessary
@@ -93,9 +85,53 @@
 #define API_SELECT_CB_VAR_ALLOC(name, retblock)   API_VAR_ALLOC_EXT(struct lwip_select_cb, MEMP_SELECT_CB, name, retblock)
 #define API_SELECT_CB_VAR_FREE(name)              API_VAR_FREE(MEMP_SELECT_CB, name)
 
+#ifndef LWIP_SOCKET_HAVE_SA_LEN
+#define LWIP_SOCKET_HAVE_SA_LEN 0
+#endif /* LWIP_SOCKET_HAVE_SA_LEN */
+
+/* Address length safe read and write */
+#if LWIP_SOCKET_HAVE_SA_LEN
+
+#if LWIP_IPV4
+#define IP4ADDR_SOCKADDR_SET_LEN(sin) \
+      (sin)->sin_len = sizeof(struct sockaddr_in)
+#endif /* LWIP_IPV4 */
+
+#if LWIP_IPV6
+#define IP6ADDR_SOCKADDR_SET_LEN(sin6) \
+      (sin6)->sin6_len = sizeof(struct sockaddr_in6)
+#endif /* LWIP_IPV6 */
+
+#define IPADDR_SOCKADDR_GET_LEN(addr) \
+      (addr)->sa.sa_len
+
+#else
+
+#if LWIP_IPV4
+#define IP4ADDR_SOCKADDR_SET_LEN(addr)
+#endif /* LWIP_IPV4 */
+
+#if LWIP_IPV6
+#define IP6ADDR_SOCKADDR_SET_LEN(addr)
+#endif /* LWIP_IPV6 */
+
+#if LWIP_IPV4 && LWIP_IPV6
+#define IPADDR_SOCKADDR_GET_LEN(addr) \
+      ((addr)->sa.sa_family == AF_INET ? sizeof(struct sockaddr_in) \
+        : ((addr)->sa.sa_family == AF_INET6 ? sizeof(struct sockaddr_in6) : 0))
+#elif LWIP_IPV4
+#define IPADDR_SOCKADDR_GET_LEN(addr) sizeof(struct sockaddr_in)
+#elif LWIP_IPV6
+#define IPADDR_SOCKADDR_GET_LEN(addr) sizeof(struct sockaddr_in6)
+#else
+#define IPADDR_SOCKADDR_GET_LEN(addr) sizeof(struct sockaddr)
+#endif /* LWIP_IPV4 && LWIP_IPV6 */
+
+#endif /* LWIP_SOCKET_HAVE_SA_LEN */
+
 #if LWIP_IPV4
 #define IP4ADDR_PORT_TO_SOCKADDR(sin, ipaddr, port) do { \
-      (sin)->sin_len = sizeof(struct sockaddr_in); \
+      IP4ADDR_SOCKADDR_SET_LEN(sin); \
       (sin)->sin_family = AF_INET; \
       (sin)->sin_port = lwip_htons((port)); \
       inet_addr_from_ip4addr(&(sin)->sin_addr, ipaddr); \
@@ -107,7 +143,7 @@
 
 #if LWIP_IPV6
 #define IP6ADDR_PORT_TO_SOCKADDR(sin6, ipaddr, port) do { \
-      (sin6)->sin6_len = sizeof(struct sockaddr_in6); \
+      IP6ADDR_SOCKADDR_SET_LEN(sin6); \
       (sin6)->sin6_family = AF_INET6; \
       (sin6)->sin6_port = lwip_htons((port)); \
       (sin6)->sin6_flowinfo = 0; \
@@ -164,7 +200,7 @@ static void sockaddr_to_ipaddr_port(const struct sockaddr *sockaddr, ip_addr_t *
                                                     IS_SOCK_ADDR_TYPE_VALID(name))
 #define SOCK_ADDR_TYPE_MATCH_OR_UNSPEC(name, sock) (((name)->sa_family == AF_UNSPEC) || \
                                                     SOCK_ADDR_TYPE_MATCH(name, sock))
-#define IS_SOCK_ADDR_ALIGNED(name)      ((((mem_ptr_t)(name)) % 4) == 0)
+#define IS_SOCK_ADDR_ALIGNED(name)      ((((mem_ptr_t)(name)) % LWIP_MIN(4, MEM_ALIGNMENT)) == 0)
 
 
 #define LWIP_SOCKOPT_CHECK_OPTLEN(sock, optlen, opttype) do { if ((optlen) < sizeof(opttype)) { done_socket(sock); return EINVAL; }}while(0)
@@ -186,7 +222,7 @@ static void sockaddr_to_ipaddr_port(const struct sockaddr *sockaddr, ip_addr_t *
 #define LWIP_SETGETSOCKOPT_DATA_VAR_ALLOC(name, sock) do { \
   name = (struct lwip_setgetsockopt_data *)memp_malloc(MEMP_SOCKET_SETGETSOCKOPT_DATA); \
   if (name == NULL) { \
-    sock_set_errno(sock, ENOMEM); \
+    set_errno(ENOMEM); \
     done_socket(sock); \
     return -1; \
   } }while(0)
@@ -285,11 +321,6 @@ static volatile int select_cb_ctr;
 /** The global list of tasks waiting for select */
 static struct lwip_select_cb *select_cb_list;
 #endif /* LWIP_SOCKET_SELECT || LWIP_SOCKET_POLL */
-
-#define sock_set_errno(sk, e) do { \
-  const int sockerr = (e); \
-  set_errno(sockerr); \
-} while (0)
 
 /* Forward declaration of some functions */
 #if LWIP_SOCKET_SELECT || LWIP_SOCKET_POLL
@@ -537,7 +568,6 @@ alloc_socket(struct netconn *newconn, int accepted)
        * (unless it has been created by accept()). */
       sockets[i].sendevent  = (NETCONNTYPE_GROUP(newconn->type) == NETCONN_TCP ? (accepted != 0) : 1);
       sockets[i].errevent   = 0;
-      init_waitqueue_head(&sockets[i].wq);
 #endif /* LWIP_SOCKET_SELECT || LWIP_SOCKET_POLL */
       return i + LWIP_SOCKET_OFFSET;
     }
@@ -630,7 +660,7 @@ lwip_accept(int s, struct sockaddr *addr, socklen_t *addrlen)
 {
   struct lwip_sock *sock, *nsock;
   struct netconn *newconn;
-  ip_addr_t naddr;
+  ip_addr_t naddr = {0};
   u16_t port = 0;
   int newsock;
   err_t err;
@@ -648,11 +678,11 @@ lwip_accept(int s, struct sockaddr *addr, socklen_t *addrlen)
   if (err != ERR_OK) {
     LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_accept(%d): netconn_acept failed, err=%d\n", s, err));
     if (NETCONNTYPE_GROUP(netconn_type(sock->conn)) != NETCONN_TCP) {
-      sock_set_errno(sock, EOPNOTSUPP);
+      set_errno(EOPNOTSUPP);
     } else if (err == ERR_CLSD) {
-      sock_set_errno(sock, EINVAL);
+      set_errno(EINVAL);
     } else {
-      sock_set_errno(sock, err_to_errno(err));
+      set_errno(err_to_errno(err));
     }
     done_socket(sock);
     return -1;
@@ -662,31 +692,12 @@ lwip_accept(int s, struct sockaddr *addr, socklen_t *addrlen)
   newsock = alloc_socket(newconn, 1);
   if (newsock == -1) {
     netconn_delete(newconn);
-    sock_set_errno(sock, ENFILE);
+    set_errno(ENFILE);
     done_socket(sock);
     return -1;
   }
   LWIP_ASSERT("invalid socket index", (newsock >= LWIP_SOCKET_OFFSET) && (newsock < NUM_SOCKETS + LWIP_SOCKET_OFFSET));
   nsock = &sockets[newsock - LWIP_SOCKET_OFFSET];
-
-  /* See event_callback: If data comes in right away after an accept, even
-   * though the server task might not have created a new socket yet.
-   * In that case, newconn->socket is counted down (newconn->socket--),
-   * so nsock->rcvevent is >= 1 here!
-   */
-  SYS_ARCH_PROTECT(lev);
-  recvevent = (s16_t)(-1 - newconn->socket);
-  newconn->socket = newsock;
-  SYS_ARCH_UNPROTECT(lev);
-
-  if (newconn->callback) {
-    LOCK_TCPIP_CORE();
-    while (recvevent > 0) {
-      recvevent--;
-      newconn->callback(newconn, NETCONN_EVT_RCVPLUS, 0);
-    }
-    UNLOCK_TCPIP_CORE();
-  }
 
   /* Note that POSIX only requires us to check addr is non-NULL. addrlen must
    * not be NULL if addr is valid.
@@ -698,25 +709,46 @@ lwip_accept(int s, struct sockaddr *addr, socklen_t *addrlen)
     if (err != ERR_OK) {
       LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_accept(%d): netconn_peer failed, err=%d\n", s, err));
       free_socket(nsock, 1);
-      sock_set_errno(sock, err_to_errno(err));
+      set_errno(err_to_errno(err));
       done_socket(sock);
       return -1;
     }
 
     IPADDR_PORT_TO_SOCKADDR(&tempaddr, &naddr, port);
-    if (*addrlen > tempaddr.sa.sa_len) {
-      *addrlen = tempaddr.sa.sa_len;
+    if (*addrlen > IPADDR_SOCKADDR_GET_LEN(&tempaddr)) {
+      *addrlen = IPADDR_SOCKADDR_GET_LEN(&tempaddr);
     }
     MEMCPY(addr, &tempaddr, *addrlen);
+  }
 
+  /* See event_callback: If data comes in right away after an accept, even
+   * though the server task might not have created a new socket yet.
+   * In that case, newconn->socket is counted down (newconn->socket--),
+   * so nsock->rcvevent is >= 1 here!
+   */
+  SYS_ARCH_PROTECT(lev);
+  recvevent = (s16_t)(-1 - newconn->callback_arg.socket);
+  newconn->callback_arg.socket = newsock;
+  SYS_ARCH_UNPROTECT(lev);
+
+  if (newconn->callback) {
+    LOCK_TCPIP_CORE();
+    while (recvevent > 0) {
+      recvevent--;
+      newconn->callback(newconn, NETCONN_EVT_RCVPLUS, 0);
+    }
+    UNLOCK_TCPIP_CORE();
+  }
+
+  if ((addr != NULL) && (addrlen != NULL)) {
     LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_accept(%d) returning new sock=%d addr=", s, newsock));
     ip_addr_debug_print_val(SOCKETS_DEBUG, naddr);
     LWIP_DEBUGF(SOCKETS_DEBUG, (" port=%"U16_F"\n", port));
   } else {
-    LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_accept(%d) returning new sock=%d", s, newsock));
+    LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_accept(%d) returning new sock=%d\n", s, newsock));
   }
 
-  sock_set_errno(sock, 0);
+  set_errno(0);
   done_socket(sock);
   done_socket(nsock);
   return newsock;
@@ -737,7 +769,7 @@ lwip_bind(int s, const struct sockaddr *name, socklen_t namelen)
 
   if (!SOCK_ADDR_TYPE_MATCH(name, sock)) {
     /* sockaddr does not match socket type (IPv4/IPv6) */
-    sock_set_errno(sock, err_to_errno(ERR_VAL));
+    set_errno(err_to_errno(ERR_VAL));
     done_socket(sock);
     return -1;
   }
@@ -745,7 +777,7 @@ lwip_bind(int s, const struct sockaddr *name, socklen_t namelen)
   /* check size, family and alignment of 'name' */
   LWIP_ERROR("lwip_bind: invalid address", (IS_SOCK_ADDR_LEN_VALID(namelen) &&
              IS_SOCK_ADDR_TYPE_VALID(name) && IS_SOCK_ADDR_ALIGNED(name)),
-             sock_set_errno(sock, err_to_errno(ERR_ARG)); done_socket(sock); return -1;);
+             set_errno(err_to_errno(ERR_ARG)); done_socket(sock); return -1;);
   LWIP_UNUSED_ARG(namelen);
 
   SOCKADDR_TO_IPADDR_PORT(name, &local_addr, local_port);
@@ -765,13 +797,13 @@ lwip_bind(int s, const struct sockaddr *name, socklen_t namelen)
 
   if (err != ERR_OK) {
     LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_bind(%d) failed, err=%d\n", s, err));
-    sock_set_errno(sock, err_to_errno(err));
+    set_errno(err_to_errno(err));
     done_socket(sock);
     return -1;
   }
 
   LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_bind(%d) succeeded\n", s));
-  sock_set_errno(sock, 0);
+  set_errno(0);
   done_socket(sock);
   return 0;
 }
@@ -779,17 +811,6 @@ lwip_bind(int s, const struct sockaddr *name, socklen_t namelen)
 int
 lwip_close(int s)
 {
-#if LWIP_ENABLE_DISTRIBUTED_NET
-  if (!is_distributed_net_enabled()) {
-    return lwip_close_internal(s);
-  }
-  return distributed_net_close(s);
-}
-
-int
-lwip_close_internal(int s)
-{
-#endif
   struct lwip_sock *sock;
   int is_tcp = 0;
   err_t err;
@@ -818,7 +839,7 @@ lwip_close_internal(int s)
 
   err = netconn_prepare_delete(sock->conn);
   if (err != ERR_OK) {
-    sock_set_errno(sock, err_to_errno(err));
+    set_errno(err_to_errno(err));
     done_socket(sock);
     return -1;
   }
@@ -831,17 +852,6 @@ lwip_close_internal(int s)
 int
 lwip_connect(int s, const struct sockaddr *name, socklen_t namelen)
 {
-#if LWIP_ENABLE_DISTRIBUTED_NET
-  if (!is_distributed_net_enabled()) {
-    return lwip_connect_internal(s, name, namelen);
-  }
-  return distributed_net_connect(s, name, namelen);
-}
-
-int
-lwip_connect_internal(int s, const struct sockaddr *name, socklen_t namelen)
-{
-#endif
   struct lwip_sock *sock;
   err_t err;
 
@@ -852,7 +862,7 @@ lwip_connect_internal(int s, const struct sockaddr *name, socklen_t namelen)
 
   if (!SOCK_ADDR_TYPE_MATCH_OR_UNSPEC(name, sock)) {
     /* sockaddr does not match socket type (IPv4/IPv6) */
-    sock_set_errno(sock, err_to_errno(ERR_VAL));
+    set_errno(err_to_errno(ERR_VAL));
     done_socket(sock);
     return -1;
   }
@@ -868,7 +878,7 @@ lwip_connect_internal(int s, const struct sockaddr *name, socklen_t namelen)
     /* check size, family and alignment of 'name' */
     LWIP_ERROR("lwip_connect: invalid address", IS_SOCK_ADDR_LEN_VALID(namelen) &&
                IS_SOCK_ADDR_TYPE_VALID_OR_UNSPEC(name) && IS_SOCK_ADDR_ALIGNED(name),
-               sock_set_errno(sock, err_to_errno(ERR_ARG)); done_socket(sock); return -1;);
+               set_errno(err_to_errno(ERR_ARG)); done_socket(sock); return -1;);
 
     SOCKADDR_TO_IPADDR_PORT(name, &remote_addr, remote_port);
     LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_connect(%d, addr=", s));
@@ -888,13 +898,13 @@ lwip_connect_internal(int s, const struct sockaddr *name, socklen_t namelen)
 
   if (err != ERR_OK) {
     LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_connect(%d) failed, err=%d\n", s, err));
-    sock_set_errno(sock, err_to_errno(err));
+    set_errno(err_to_errno(err));
     done_socket(sock);
     return -1;
   }
 
   LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_connect(%d) succeeded\n", s));
-  sock_set_errno(sock, 0);
+  set_errno(0);
   done_socket(sock);
   return 0;
 }
@@ -928,15 +938,15 @@ lwip_listen(int s, int backlog)
   if (err != ERR_OK) {
     LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_listen(%d) failed, err=%d\n", s, err));
     if (NETCONNTYPE_GROUP(netconn_type(sock->conn)) != NETCONN_TCP) {
-      sock_set_errno(sock, EOPNOTSUPP);
+      set_errno(EOPNOTSUPP);
     } else {
-      sock_set_errno(sock, err_to_errno(err));
+      set_errno(err_to_errno(err));
     }
     done_socket(sock);
     return -1;
   }
 
-  sock_set_errno(sock, 0);
+  set_errno(0);
   done_socket(sock);
   return 0;
 }
@@ -985,7 +995,7 @@ lwip_recv_tcp(struct lwip_sock *sock, void *mem, size_t len, int flags)
         /* We should really do some error checking here. */
         LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_recv_tcp: p == NULL, error is \"%s\"!\n",
                                     lwip_strerr(err)));
-        sock_set_errno(sock, err_to_errno(err));
+        set_errno(err_to_errno(err));
         if (err == ERR_CLSD) {
           return 0;
         } else {
@@ -1004,7 +1014,7 @@ lwip_recv_tcp(struct lwip_sock *sock, void *mem, size_t len, int flags)
     } else {
       copylen = (u16_t)recv_left;
     }
-    if (recvd + copylen < recvd) {
+    if (recvd > SSIZE_MAX - copylen) {
       /* overflow */
       copylen = (u16_t)(SSIZE_MAX - recvd);
     }
@@ -1043,7 +1053,7 @@ lwip_recv_tcp_done:
     /* ensure window update after copying all data */
     netconn_tcp_recvd(sock->conn, (size_t)recvd);
   }
-  sock_set_errno(sock, 0);
+  set_errno(0);
   return recvd;
 }
 #endif
@@ -1071,11 +1081,10 @@ lwip_sock_make_addr(struct netconn *conn, ip_addr_t *fromaddr, u16_t port,
 #endif /* LWIP_IPV4 && LWIP_IPV6 */
 
   IPADDR_PORT_TO_SOCKADDR(&saddr, fromaddr, port);
-  DF_NADDR(*fromaddr);
-  if (*fromlen < saddr.sa.sa_len) {
+  if (*fromlen < IPADDR_SOCKADDR_GET_LEN(&saddr)) {
     truncated = 1;
-  } else if (*fromlen > saddr.sa.sa_len) {
-    *fromlen = saddr.sa.sa_len;
+  } else if (*fromlen > IPADDR_SOCKADDR_GET_LEN(&saddr)) {
+    *fromlen = IPADDR_SOCKADDR_GET_LEN(&saddr);
   }
   MEMCPY(from, &saddr, *fromlen);
   return truncated;
@@ -1100,11 +1109,11 @@ lwip_recv_tcp_from(struct lwip_sock *sock, struct sockaddr *from, socklen_t *fro
     /* get remote addr/port from tcp_pcb */
     u16_t port;
     ip_addr_t tmpaddr;
-    err_t err = netconn_getaddr(sock->conn, &tmpaddr, &port, 0);
+    netconn_getaddr(sock->conn, &tmpaddr, &port, 0);
     LWIP_DEBUGF(SOCKETS_DEBUG, ("%s(%d):  addr=", dbg_fn, dbg_s));
     ip_addr_debug_print_val(SOCKETS_DEBUG, tmpaddr);
     LWIP_DEBUGF(SOCKETS_DEBUG, (" port=%"U16_F" len=%d\n", port, (int)dbg_ret));
-    if (!err && from && fromlen) {
+    if (from && fromlen) {
       return lwip_sock_make_addr(sock->conn, &tmpaddr, port, from, fromlen);
     }
   }
@@ -1122,7 +1131,7 @@ lwip_recvfrom_udp_raw(struct lwip_sock *sock, int flags, struct msghdr *msg, u16
   u8_t apiflags;
   err_t err;
   u16_t buflen, copylen, copied;
-  int i;
+  msg_iovlen_t i;
 
   LWIP_UNUSED_ARG(dbg_s);
   LWIP_ERROR("lwip_recvfrom_udp_raw: invalid arguments", (msg->msg_iov != NULL) || (msg->msg_iovlen <= 0), return ERR_ARG;);
@@ -1230,18 +1239,6 @@ ssize_t
 lwip_recvfrom(int s, void *mem, size_t len, int flags,
               struct sockaddr *from, socklen_t *fromlen)
 {
-#if LWIP_ENABLE_DISTRIBUTED_NET && LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
-  if (!is_distributed_net_enabled()) {
-    return lwip_recvfrom_internal(s, mem, len, flags, from, fromlen);
-  }
-  return distributed_net_recvfrom(s, mem, len, flags, from, fromlen);
-}
-
-ssize_t
-lwip_recvfrom_internal(int s, void *mem, size_t len, int flags,
-                       struct sockaddr *from, socklen_t *fromlen)
-{
-#endif
   struct lwip_sock *sock;
   ssize_t ret;
 
@@ -1276,7 +1273,7 @@ lwip_recvfrom_internal(int s, void *mem, size_t len, int flags,
     if (err != ERR_OK) {
       LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_recvfrom[UDP/RAW](%d): buf == NULL, error is \"%s\"!\n",
                                   s, lwip_strerr(err)));
-      sock_set_errno(sock, err_to_errno(err));
+      set_errno(err_to_errno(err));
       done_socket(sock);
       return -1;
     }
@@ -1286,7 +1283,7 @@ lwip_recvfrom_internal(int s, void *mem, size_t len, int flags,
     }
   }
 
-  sock_set_errno(sock, 0);
+  set_errno(0);
   done_socket(sock);
   return ret;
 }
@@ -1324,7 +1321,7 @@ ssize_t
 lwip_recvmsg(int s, struct msghdr *message, int flags)
 {
   struct lwip_sock *sock;
-  int i;
+  msg_iovlen_t i;
   ssize_t buflen;
 
   LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_recvmsg(%d, message=%p, flags=0x%x)\n", s, (void *)message, flags));
@@ -1348,7 +1345,7 @@ lwip_recvmsg(int s, struct msghdr *message, int flags)
     if ((message->msg_iov[i].iov_base == NULL) || ((ssize_t)message->msg_iov[i].iov_len <= 0) ||
         ((size_t)(ssize_t)message->msg_iov[i].iov_len != message->msg_iov[i].iov_len) ||
         ((ssize_t)(buflen + (ssize_t)message->msg_iov[i].iov_len) <= 0)) {
-      sock_set_errno(sock, err_to_errno(ERR_VAL));
+      set_errno(err_to_errno(ERR_VAL));
       done_socket(sock);
       return -1;
     }
@@ -1382,13 +1379,13 @@ lwip_recvmsg(int s, struct msghdr *message, int flags)
     }
     if (buflen > 0) {
       /* reset socket error since we have received something */
-      sock_set_errno(sock, 0);
+      set_errno(0);
     }
     /* " If the socket is connected, the msg_name and msg_namelen members shall be ignored." */
     done_socket(sock);
     return buflen;
 #else /* LWIP_TCP */
-    sock_set_errno(sock, err_to_errno(ERR_ARG));
+    set_errno(err_to_errno(ERR_ARG));
     done_socket(sock);
     return -1;
 #endif /* LWIP_TCP */
@@ -1402,7 +1399,7 @@ lwip_recvmsg(int s, struct msghdr *message, int flags)
     if (err != ERR_OK) {
       LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_recvmsg[UDP/RAW](%d): buf == NULL, error is \"%s\"!\n",
                                   s, lwip_strerr(err)));
-      sock_set_errno(sock, err_to_errno(err));
+      set_errno(err_to_errno(err));
       done_socket(sock);
       return -1;
     }
@@ -1410,12 +1407,12 @@ lwip_recvmsg(int s, struct msghdr *message, int flags)
       message->msg_flags |= MSG_TRUNC;
     }
 
-    sock_set_errno(sock, 0);
+    set_errno(0);
     done_socket(sock);
     return (int)datagram_len;
   }
 #else /* LWIP_UDP || LWIP_RAW */
-  sock_set_errno(sock, err_to_errno(ERR_ARG));
+  set_errno(err_to_errno(ERR_ARG));
   done_socket(sock);
   return -1;
 #endif /* LWIP_UDP || LWIP_RAW */
@@ -1440,13 +1437,9 @@ lwip_send(int s, const void *data, size_t size, int flags)
   if (NETCONNTYPE_GROUP(netconn_type(sock->conn)) != NETCONN_TCP) {
 #if (LWIP_UDP || LWIP_RAW)
     done_socket(sock);
-#if LWIP_ENABLE_DISTRIBUTED_NET && LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
-    return lwip_sendto_internal(s, data, size, flags, NULL, 0);
-#else
     return lwip_sendto(s, data, size, flags, NULL, 0);
-#endif
 #else /* (LWIP_UDP || LWIP_RAW) */
-    sock_set_errno(sock, err_to_errno(ERR_ARG));
+    set_errno(err_to_errno(ERR_ARG));
     done_socket(sock);
     return -1;
 #endif /* (LWIP_UDP || LWIP_RAW) */
@@ -1459,7 +1452,7 @@ lwip_send(int s, const void *data, size_t size, int flags)
   err = netconn_write_partly(sock->conn, data, size, write_flags, &written);
 
   LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_send(%d) err=%d written=%"SZT_F"\n", s, err, written));
-  sock_set_errno(sock, err_to_errno(err));
+  set_errno(err_to_errno(err));
   done_socket(sock);
   /* casting 'written' to ssize_t is OK here since the netconn API limits it to SSIZE_MAX */
   return (err == ERR_OK ? (ssize_t)written : -1);
@@ -1468,17 +1461,6 @@ lwip_send(int s, const void *data, size_t size, int flags)
 ssize_t
 lwip_sendmsg(int s, const struct msghdr *msg, int flags)
 {
-#if LWIP_ENABLE_DISTRIBUTED_NET && LWIP_USE_GET_HOST_BY_NAME_EXTERNAL && LWIP_DISTRIBUTED_NET_ENABLE_SENDMSG
-  if (!is_distributed_net_enabled()) {
-    return lwip_sendmsg_internal(s, msg, flags);
-  }
-  return distributed_net_sendmsg(s, msg, flags);
-}
-
-ssize_t
-lwip_sendmsg_internal(int s, const struct msghdr *msg, int flags)
-{
-#endif
   struct lwip_sock *sock;
 #if LWIP_TCP
   u8_t write_flags;
@@ -1492,13 +1474,13 @@ lwip_sendmsg_internal(int s, const struct msghdr *msg, int flags)
   }
 
   LWIP_ERROR("lwip_sendmsg: invalid msghdr", msg != NULL,
-             sock_set_errno(sock, err_to_errno(ERR_ARG)); done_socket(sock); return -1;);
+             set_errno(err_to_errno(ERR_ARG)); done_socket(sock); return -1;);
   LWIP_ERROR("lwip_sendmsg: invalid msghdr iov", msg->msg_iov != NULL,
-             sock_set_errno(sock, err_to_errno(ERR_ARG)); done_socket(sock); return -1;);
+             set_errno(err_to_errno(ERR_ARG)); done_socket(sock); return -1;);
   LWIP_ERROR("lwip_sendmsg: maximum iovs exceeded", (msg->msg_iovlen > 0) && (msg->msg_iovlen <= IOV_MAX),
-             sock_set_errno(sock, EMSGSIZE); done_socket(sock); return -1;);
+             set_errno(EMSGSIZE); done_socket(sock); return -1;);
   LWIP_ERROR("lwip_sendmsg: unsupported flags", (flags & ~(MSG_DONTWAIT | MSG_MORE)) == 0,
-             sock_set_errno(sock, EOPNOTSUPP); done_socket(sock); return -1;);
+             set_errno(EOPNOTSUPP); done_socket(sock); return -1;);
 
   LWIP_UNUSED_ARG(msg->msg_control);
   LWIP_UNUSED_ARG(msg->msg_controllen);
@@ -1512,12 +1494,12 @@ lwip_sendmsg_internal(int s, const struct msghdr *msg, int flags)
 
     written = 0;
     err = netconn_write_vectors_partly(sock->conn, (struct netvector *)msg->msg_iov, (u16_t)msg->msg_iovlen, write_flags, &written);
-    sock_set_errno(sock, err_to_errno(err));
+    set_errno(err_to_errno(err));
     done_socket(sock);
     /* casting 'written' to ssize_t is OK here since the netconn API limits it to SSIZE_MAX */
     return (err == ERR_OK ? (ssize_t)written : -1);
 #else /* LWIP_TCP */
-    sock_set_errno(sock, err_to_errno(ERR_ARG));
+    set_errno(err_to_errno(ERR_ARG));
     done_socket(sock);
     return -1;
 #endif /* LWIP_TCP */
@@ -1526,13 +1508,13 @@ lwip_sendmsg_internal(int s, const struct msghdr *msg, int flags)
 #if LWIP_UDP || LWIP_RAW
   {
     struct netbuf chain_buf;
-    int i;
+    msg_iovlen_t i;
     ssize_t size = 0;
 
     LWIP_UNUSED_ARG(flags);
     LWIP_ERROR("lwip_sendmsg: invalid msghdr name", (((msg->msg_name == NULL) && (msg->msg_namelen == 0)) ||
                IS_SOCK_ADDR_LEN_VALID(msg->msg_namelen)),
-               sock_set_errno(sock, err_to_errno(ERR_ARG)); done_socket(sock); return -1;);
+               set_errno(err_to_errno(ERR_ARG)); done_socket(sock); return -1;);
 
     /* initialize chain buffer with destination */
     memset(&chain_buf, 0, sizeof(struct netbuf));
@@ -1623,17 +1605,17 @@ lwip_sendmsg_internal(int s, const struct msghdr *msg, int flags)
     /* deallocated the buffer */
     netbuf_free(&chain_buf);
 
-    sock_set_errno(sock, err_to_errno(err));
+    set_errno(err_to_errno(err));
     done_socket(sock);
     return (err == ERR_OK ? size : -1);
 sendmsg_emsgsize:
-    sock_set_errno(sock, EMSGSIZE);
+    set_errno(EMSGSIZE);
     netbuf_free(&chain_buf);
     done_socket(sock);
     return -1;
   }
 #else /* LWIP_UDP || LWIP_RAW */
-  sock_set_errno(sock, err_to_errno(ERR_ARG));
+  set_errno(err_to_errno(ERR_ARG));
   done_socket(sock);
   return -1;
 #endif /* LWIP_UDP || LWIP_RAW */
@@ -1643,18 +1625,6 @@ ssize_t
 lwip_sendto(int s, const void *data, size_t size, int flags,
             const struct sockaddr *to, socklen_t tolen)
 {
-#if LWIP_ENABLE_DISTRIBUTED_NET && LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
-  if (!is_distributed_net_enabled()) {
-    return lwip_sendto_internal(s, data, size, flags, to, tolen);
-  }
-  return distributed_net_sendto(s, data, size, flags, to, tolen);
-}
-
-ssize_t
-lwip_sendto_internal(int s, const void *data, size_t size, int flags,
-                     const struct sockaddr *to, socklen_t tolen)
-{
-#endif
   struct lwip_sock *sock;
   err_t err;
   u16_t short_size;
@@ -1672,7 +1642,7 @@ lwip_sendto_internal(int s, const void *data, size_t size, int flags,
     return lwip_send(s, data, size, flags);
 #else /* LWIP_TCP */
     LWIP_UNUSED_ARG(flags);
-    sock_set_errno(sock, err_to_errno(ERR_ARG));
+    set_errno(err_to_errno(ERR_ARG));
     done_socket(sock);
     return -1;
 #endif /* LWIP_TCP */
@@ -1680,7 +1650,7 @@ lwip_sendto_internal(int s, const void *data, size_t size, int flags,
 
   if (size > LWIP_MIN(0xFFFF, SSIZE_MAX)) {
     /* cannot fit into one datagram (at least for us) */
-    sock_set_errno(sock, EMSGSIZE);
+    set_errno(EMSGSIZE);
     done_socket(sock);
     return -1;
   }
@@ -1688,7 +1658,7 @@ lwip_sendto_internal(int s, const void *data, size_t size, int flags,
   LWIP_ERROR("lwip_sendto: invalid address", (((to == NULL) && (tolen == 0)) ||
              (IS_SOCK_ADDR_LEN_VALID(tolen) &&
               ((to != NULL) && (IS_SOCK_ADDR_TYPE_VALID(to) && IS_SOCK_ADDR_ALIGNED(to))))),
-             sock_set_errno(sock, err_to_errno(ERR_ARG)); done_socket(sock); return -1;);
+             set_errno(err_to_errno(ERR_ARG)); done_socket(sock); return -1;);
   LWIP_UNUSED_ARG(tolen);
 
   /* initialize a buffer */
@@ -1746,7 +1716,7 @@ lwip_sendto_internal(int s, const void *data, size_t size, int flags,
   /* deallocated the buffer */
   netbuf_free(&buf);
 
-  sock_set_errno(sock, err_to_errno(err));
+  set_errno(err_to_errno(err));
   done_socket(sock);
   return (err == ERR_OK ? short_size : -1);
 }
@@ -1805,7 +1775,7 @@ lwip_socket(int domain, int type, int protocol)
     set_errno(ENFILE);
     return -1;
   }
-  conn->socket = i;
+  conn->callback_arg.socket = i;
   done_socket(&sockets[i - LWIP_SOCKET_OFFSET]);
   LWIP_DEBUGF(SOCKETS_DEBUG, ("%d\n", i));
   set_errno(0);
@@ -2147,7 +2117,7 @@ lwip_select(int maxfdp1, fd_set *readset, fd_set *writeset, fd_set *exceptset,
           set_errno(EBADF);
         } else if (!nready) {
           /* Still none ready, just wait to be woken */
-          if (timeout == 0) {
+          if (timeout == NULL) {
             /* Wait forever */
             msectimeout = 0;
           } else {
@@ -2561,7 +2531,7 @@ event_callback(struct netconn *conn, enum netconn_evt evt, u16_t len)
 
   /* Get socket */
   if (conn) {
-    s = conn->socket;
+    s = conn->callback_arg.socket;
     if (s < 0) {
       /* Data comes in right away after an accept, even though
        * the server task might not have created a new socket yet.
@@ -2569,16 +2539,16 @@ event_callback(struct netconn *conn, enum netconn_evt evt, u16_t len)
        * will use the data later. Note that only receive events
        * can happen before the new socket is set up. */
       SYS_ARCH_PROTECT(lev);
-      if (conn->socket < 0) {
+      if (conn->callback_arg.socket < 0) {
         if (evt == NETCONN_EVT_RCVPLUS) {
           /* conn->socket is -1 on initialization
              lwip_accept adjusts sock->recvevent if conn->socket < -1 */
-          conn->socket--;
+          conn->callback_arg.socket--;
         }
         SYS_ARCH_UNPROTECT(lev);
         return;
       }
-      s = conn->socket;
+      s = conn->callback_arg.socket;
       SYS_ARCH_UNPROTECT(lev);
     }
 
@@ -2634,7 +2604,6 @@ event_callback(struct netconn *conn, enum netconn_evt evt, u16_t len)
   } else {
     SYS_ARCH_UNPROTECT(lev);
   }
-  poll_check_waiters(s, check_waiters);
   done_socket(sock);
 }
 
@@ -2745,12 +2714,12 @@ lwip_shutdown(int s, int how)
 
   if (sock->conn != NULL) {
     if (NETCONNTYPE_GROUP(netconn_type(sock->conn)) != NETCONN_TCP) {
-      sock_set_errno(sock, EOPNOTSUPP);
+      set_errno(EOPNOTSUPP);
       done_socket(sock);
       return -1;
     }
   } else {
-    sock_set_errno(sock, ENOTCONN);
+    set_errno(ENOTCONN);
     done_socket(sock);
     return -1;
   }
@@ -2763,13 +2732,13 @@ lwip_shutdown(int s, int how)
     shut_rx = 1;
     shut_tx = 1;
   } else {
-    sock_set_errno(sock, EINVAL);
+    set_errno(EINVAL);
     done_socket(sock);
     return -1;
   }
   err = netconn_shutdown(sock->conn, shut_rx, shut_tx);
 
-  sock_set_errno(sock, err_to_errno(err));
+  set_errno(err_to_errno(err));
   done_socket(sock);
   return (err == ERR_OK ? 0 : -1);
 }
@@ -2791,7 +2760,7 @@ lwip_getaddrname(int s, struct sockaddr *name, socklen_t *namelen, u8_t local)
   /* get the IP address and port */
   err = netconn_getaddr(sock->conn, &naddr, &port, local);
   if (err != ERR_OK) {
-    sock_set_errno(sock, err_to_errno(err));
+    set_errno(err_to_errno(err));
     done_socket(sock);
     return -1;
   }
@@ -2811,12 +2780,12 @@ lwip_getaddrname(int s, struct sockaddr *name, socklen_t *namelen, u8_t local)
   ip_addr_debug_print_val(SOCKETS_DEBUG, naddr);
   LWIP_DEBUGF(SOCKETS_DEBUG, (" port=%"U16_F")\n", port));
 
-  if (*namelen > saddr.sa.sa_len) {
-    *namelen = saddr.sa.sa_len;
+  if (*namelen > IPADDR_SOCKADDR_GET_LEN(&saddr)) {
+    *namelen = IPADDR_SOCKADDR_GET_LEN(&saddr);
   }
   MEMCPY(name, &saddr, *namelen);
 
-  sock_set_errno(sock, 0);
+  set_errno(0);
   done_socket(sock);
   return 0;
 }
@@ -2848,7 +2817,7 @@ lwip_getsockopt(int s, int level, int optname, void *optval, socklen_t *optlen)
   }
 
   if ((NULL == optval) || (NULL == optlen)) {
-    sock_set_errno(sock, EFAULT);
+    set_errno(EFAULT);
     done_socket(sock);
     return -1;
   }
@@ -2864,7 +2833,7 @@ lwip_getsockopt(int s, int level, int optname, void *optval, socklen_t *optlen)
 #if LWIP_MPU_COMPATIBLE
   /* MPU_COMPATIBLE copies the optval data, so check for max size here */
   if (*optlen > LWIP_SETGETSOCKOPT_MAXOPTLEN) {
-    sock_set_errno(sock, ENOBUFS);
+    set_errno(ENOBUFS);
     done_socket(sock);
     return -1;
   }
@@ -2887,7 +2856,7 @@ lwip_getsockopt(int s, int level, int optname, void *optval, socklen_t *optlen)
   cberr = tcpip_callback(lwip_getsockopt_callback, &LWIP_SETGETSOCKOPT_DATA_VAR_REF(data));
   if (cberr != ERR_OK) {
     LWIP_SETGETSOCKOPT_DATA_VAR_FREE(data);
-    sock_set_errno(sock, err_to_errno(cberr));
+    set_errno(err_to_errno(cberr));
     done_socket(sock);
     return -1;
   }
@@ -2900,12 +2869,12 @@ lwip_getsockopt(int s, int level, int optname, void *optval, socklen_t *optlen)
          LWIP_SETGETSOCKOPT_DATA_VAR_REF(data).optlen);
 #endif /* LWIP_MPU_COMPATIBLE */
 
-  /* maybe lwip_getsockopt_internal has changed err */
+  /* maybe lwip_getsockopt_impl has changed err */
   err = LWIP_SETGETSOCKOPT_DATA_VAR_REF(data).err;
   LWIP_SETGETSOCKOPT_DATA_VAR_FREE(data);
 #endif /* LWIP_TCPIP_CORE_LOCKING */
 
-  sock_set_errno(sock, err);
+  set_errno(err);
   done_socket(sock);
   return err ? -1 : 0;
 }
@@ -2953,6 +2922,49 @@ lwip_sockopt_to_ipopt(int optname)
   }
 }
 
+#if LWIP_IPV6 && LWIP_RAW
+static void
+lwip_getsockopt_impl_ipv6_checksum(int s, struct lwip_sock* sock, void* optval)
+{
+  if (sock->conn->pcb.raw->chksum_reqd == 0) {
+    *(int*)optval = -1;
+  }
+  else {
+    *(int*)optval = sock->conn->pcb.raw->chksum_offset;
+  }
+  LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_getsockopt(%d, IPPROTO_RAW, IPV6_CHECKSUM) = %d\n",
+    s, (*(int*)optval)));
+}
+
+static int
+lwip_setsockopt_impl_ipv6_checksum(int s, struct lwip_sock* sock, const void* optval, socklen_t optlen)
+{
+  /* It should not be possible to disable the checksum generation with ICMPv6
+   * as per RFC 3542 chapter 3.1 */
+  if (sock->conn->pcb.raw->protocol == IPPROTO_ICMPV6) {
+    done_socket(sock);
+    return EINVAL;
+  }
+
+  LWIP_SOCKOPT_CHECK_OPTLEN_CONN_PCB_TYPE(sock, optlen, int, NETCONN_RAW);
+  if (*(const int*)optval < 0) {
+    sock->conn->pcb.raw->chksum_reqd = 0;
+  }
+  else if (*(const int*)optval & 1) {
+    /* Per RFC3542, odd offsets are not allowed */
+    done_socket(sock);
+    return EINVAL;
+  }
+  else {
+    sock->conn->pcb.raw->chksum_reqd = 1;
+    sock->conn->pcb.raw->chksum_offset = (u16_t) * (const int*)optval;
+  }
+  LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_setsockopt(%d, IPPROTO_RAW, IPV6_CHECKSUM, ..) -> %d\n",
+    s, sock->conn->pcb.raw->chksum_reqd));
+  return 0;
+}
+#endif
+
 /** lwip_getsockopt_impl: the actual implementation of getsockopt:
  * same argument as lwip_getsockopt, either called directly or through callback
  */
@@ -2967,6 +2979,7 @@ lwip_getsockopt_impl(int s, int level, int optname, void *optval, socklen_t *opt
 
 #ifdef LWIP_HOOK_SOCKETS_GETSOCKOPT
   if (LWIP_HOOK_SOCKETS_GETSOCKOPT(s, sock, level, optname, optval, optlen, &err)) {
+    done_socket(sock);
     return err;
   }
 #endif
@@ -3202,6 +3215,12 @@ lwip_getsockopt_impl(int s, int level, int optname, void *optval, socklen_t *opt
     /* Level: IPPROTO_IPV6 */
     case IPPROTO_IPV6:
       switch (optname) {
+#if LWIP_IPV6 && LWIP_RAW
+        case IPV6_CHECKSUM:
+          LWIP_SOCKOPT_CHECK_OPTLEN_CONN_PCB_TYPE(sock, *optlen, int, NETCONN_RAW);
+          lwip_getsockopt_impl_ipv6_checksum(s, sock, optval);
+          break;
+#endif /* LWIP_IPV6 && LWIP_RAW */
         case IPV6_V6ONLY:
           LWIP_SOCKOPT_CHECK_OPTLEN_CONN(sock, *optlen, int);
           *(int *)optval = (netconn_get_ipv6only(sock->conn) ? 1 : 0);
@@ -3252,13 +3271,7 @@ lwip_getsockopt_impl(int s, int level, int optname, void *optval, socklen_t *opt
 #if LWIP_IPV6 && LWIP_RAW
         case IPV6_CHECKSUM:
           LWIP_SOCKOPT_CHECK_OPTLEN_CONN_PCB_TYPE(sock, *optlen, int, NETCONN_RAW);
-          if (sock->conn->pcb.raw->chksum_reqd == 0) {
-            *(int *)optval = -1;
-          } else {
-            *(int *)optval = sock->conn->pcb.raw->chksum_offset;
-          }
-          LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_getsockopt(%d, IPPROTO_RAW, IPV6_CHECKSUM) = %d\n",
-                                      s, (*(int *)optval)) );
+          lwip_getsockopt_impl_ipv6_checksum(s, sock, optval);
           break;
 #endif /* LWIP_IPV6 && LWIP_RAW */
         default:
@@ -3294,7 +3307,7 @@ lwip_setsockopt(int s, int level, int optname, const void *optval, socklen_t opt
   }
 
   if (NULL == optval) {
-    sock_set_errno(sock, EFAULT);
+    set_errno(EFAULT);
     done_socket(sock);
     return -1;
   }
@@ -3304,16 +3317,13 @@ lwip_setsockopt(int s, int level, int optname, const void *optval, socklen_t opt
   LOCK_TCPIP_CORE();
   err = lwip_setsockopt_impl(s, level, optname, optval, optlen);
   UNLOCK_TCPIP_CORE();
-#if LWIP_LOWPOWER
-  tcpip_send_msg_na(LOW_NON_BLOCK);
-#endif
 
 #else /* LWIP_TCPIP_CORE_LOCKING */
 
 #if LWIP_MPU_COMPATIBLE
   /* MPU_COMPATIBLE copies the optval data, so check for max size here */
   if (optlen > LWIP_SETGETSOCKOPT_MAXOPTLEN) {
-    sock_set_errno(sock, ENOBUFS);
+    set_errno(ENOBUFS);
     done_socket(sock);
     return -1;
   }
@@ -3338,18 +3348,18 @@ lwip_setsockopt(int s, int level, int optname, const void *optval, socklen_t opt
   cberr = tcpip_callback(lwip_setsockopt_callback, &LWIP_SETGETSOCKOPT_DATA_VAR_REF(data));
   if (cberr != ERR_OK) {
     LWIP_SETGETSOCKOPT_DATA_VAR_FREE(data);
-    sock_set_errno(sock, err_to_errno(cberr));
+    set_errno(err_to_errno(cberr));
     done_socket(sock);
     return -1;
   }
   sys_arch_sem_wait((sys_sem_t *)(LWIP_SETGETSOCKOPT_DATA_VAR_REF(data).completed_sem), 0);
 
-  /* maybe lwip_getsockopt_internal has changed err */
+  /* maybe lwip_setsockopt_impl has changed err */
   err = LWIP_SETGETSOCKOPT_DATA_VAR_REF(data).err;
   LWIP_SETGETSOCKOPT_DATA_VAR_FREE(data);
 #endif  /* LWIP_TCPIP_CORE_LOCKING */
 
-  sock_set_errno(sock, err);
+  set_errno(err);
   done_socket(sock);
   return err ? -1 : 0;
 }
@@ -3391,6 +3401,7 @@ lwip_setsockopt_impl(int s, int level, int optname, const void *optval, socklen_
 
 #ifdef LWIP_HOOK_SOCKETS_SETSOCKOPT
   if (LWIP_HOOK_SOCKETS_SETSOCKOPT(s, sock, level, optname, optval, optlen, &err)) {
+    done_socket(sock);
     return err;
   }
 #endif
@@ -3682,7 +3693,15 @@ lwip_setsockopt_impl(int s, int level, int optname, const void *optval, socklen_
     /* Level: IPPROTO_IPV6 */
     case IPPROTO_IPV6:
       switch (optname) {
-        case IPV6_V6ONLY:
+#if LWIP_IPV6 && LWIP_RAW
+        case IPV6_CHECKSUM:
+          err = lwip_setsockopt_impl_ipv6_checksum(s, sock, optval, optlen);
+          if (err) {
+            return err;
+          }
+          break;
+#endif /* LWIP_IPV6 && LWIP_RAW */
+      case IPV6_V6ONLY:
           LWIP_SOCKOPT_CHECK_OPTLEN_CONN_PCB(sock, optlen, int);
           if (*(const int *)optval) {
             netconn_set_ipv6only(sock->conn, 1);
@@ -3703,11 +3722,7 @@ lwip_setsockopt_impl(int s, int level, int optname, const void *optval, socklen_
           LWIP_SOCKOPT_CHECK_OPTLEN_CONN_PCB_TYPE(sock, optlen, struct ipv6_mreq, NETCONN_UDP);
           inet6_addr_to_ip6addr(&multi_addr, &imr->ipv6mr_multiaddr);
           LWIP_ASSERT("Invalid netif index", imr->ipv6mr_interface <= 0xFFu);
-#ifdef LOSCFG_NET_CONTAINER
-          netif = netif_get_by_index((u8_t)imr->ipv6mr_interface, get_net_group_from_ippcb(sock->conn->pcb.ip));
-#else
           netif = netif_get_by_index((u8_t)imr->ipv6mr_interface);
-#endif
           if (netif == NULL) {
             err = EADDRNOTAVAIL;
             break;
@@ -3784,26 +3799,10 @@ lwip_setsockopt_impl(int s, int level, int optname, const void *optval, socklen_
       switch (optname) {
 #if LWIP_IPV6 && LWIP_RAW
         case IPV6_CHECKSUM:
-          /* It should not be possible to disable the checksum generation with ICMPv6
-           * as per RFC 3542 chapter 3.1 */
-          if (sock->conn->pcb.raw->protocol == IPPROTO_ICMPV6) {
-            done_socket(sock);
-            return EINVAL;
+          err = lwip_setsockopt_impl_ipv6_checksum(s, sock, optval, optlen);
+          if (err) {
+            return err;
           }
-
-          LWIP_SOCKOPT_CHECK_OPTLEN_CONN_PCB_TYPE(sock, optlen, int, NETCONN_RAW);
-          if (*(const int *)optval < 0) {
-            sock->conn->pcb.raw->chksum_reqd = 0;
-          } else if (*(const int *)optval & 1) {
-            /* Per RFC3542, odd offsets are not allowed */
-            done_socket(sock);
-            return EINVAL;
-          } else {
-            sock->conn->pcb.raw->chksum_reqd = 1;
-            sock->conn->pcb.raw->chksum_offset = (u16_t) * (const int *)optval;
-          }
-          LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_setsockopt(%d, IPPROTO_RAW, IPV6_CHECKSUM, ..) -> %d\n",
-                                      s, sock->conn->pcb.raw->chksum_reqd));
           break;
 #endif /* LWIP_IPV6 && LWIP_RAW */
         default:
@@ -3841,7 +3840,7 @@ lwip_ioctl(int s, long cmd, void *argp)
 #if LWIP_SO_RCVBUF || LWIP_FIONREAD_LINUXMODE
     case FIONREAD:
       if (!argp) {
-        sock_set_errno(sock, EINVAL);
+        set_errno(EINVAL);
         done_socket(sock);
         return -1;
       }
@@ -3884,7 +3883,7 @@ lwip_ioctl(int s, long cmd, void *argp)
       *((int *)argp) = recv_avail;
 
       LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_ioctl(%d, FIONREAD, %p) = %"U16_F"\n", s, argp, *((u16_t *)argp)));
-      sock_set_errno(sock, 0);
+      set_errno(0);
       done_socket(sock);
       return 0;
 #else /* LWIP_SO_RCVBUF */
@@ -3899,16 +3898,15 @@ lwip_ioctl(int s, long cmd, void *argp)
       }
       netconn_set_nonblocking(sock->conn, val);
       LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_ioctl(%d, FIONBIO, %d)\n", s, val));
-      sock_set_errno(sock, 0);
+      set_errno(0);
       done_socket(sock);
       return 0;
 
     default:
-      IOCTL_CMD_CASE_HANDLER();
       break;
   } /* switch (cmd) */
   LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_ioctl(%d, UNIMPL: 0x%lx, %p)\n", s, cmd, argp));
-  sock_set_errno(sock, ENOSYS); /* not yet implemented */
+  set_errno(ENOSYS); /* not yet implemented */
   done_socket(sock);
   return -1;
 }
@@ -3932,7 +3930,7 @@ lwip_fcntl(int s, int cmd, int val)
   switch (cmd) {
     case F_GETFL:
       ret = netconn_is_nonblocking(sock->conn) ? O_NONBLOCK : 0;
-      sock_set_errno(sock, 0);
+      set_errno(0);
 
       if (NETCONNTYPE_GROUP(netconn_type(sock->conn)) == NETCONN_TCP) {
 #if LWIP_TCPIP_CORE_LOCKING
@@ -3973,14 +3971,14 @@ lwip_fcntl(int s, int cmd, int val)
         /* only O_NONBLOCK, all other bits are zero */
         netconn_set_nonblocking(sock->conn, val & O_NONBLOCK);
         ret = 0;
-        sock_set_errno(sock, 0);
+        set_errno(0);
       } else {
-        sock_set_errno(sock, ENOSYS); /* not yet implemented */
+        set_errno(ENOSYS); /* not yet implemented */
       }
       break;
     default:
       LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_fcntl(%d, UNIMPL: %d, %d)\n", s, cmd, val));
-      sock_set_errno(sock, ENOSYS); /* not yet implemented */
+      set_errno(ENOSYS); /* not yet implemented */
       break;
   }
   done_socket(sock);
@@ -4111,8 +4109,8 @@ lwip_socket_unregister_membership(int s, const ip4_addr_t *if_addr, const ip4_ad
 
   for (i = 0; i < LWIP_SOCKET_MAX_MEMBERSHIPS; i++) {
     if ((socket_ipv4_multicast_memberships[i].sock == sock) &&
-        ip4_addr_cmp(&socket_ipv4_multicast_memberships[i].if_addr, if_addr) &&
-        ip4_addr_cmp(&socket_ipv4_multicast_memberships[i].multi_addr, multi_addr)) {
+        ip4_addr_eq(&socket_ipv4_multicast_memberships[i].if_addr, if_addr) &&
+        ip4_addr_eq(&socket_ipv4_multicast_memberships[i].multi_addr, multi_addr)) {
       socket_ipv4_multicast_memberships[i].sock = NULL;
       ip4_addr_set_zero(&socket_ipv4_multicast_memberships[i].if_addr);
       ip4_addr_set_zero(&socket_ipv4_multicast_memberships[i].multi_addr);
@@ -4200,7 +4198,7 @@ lwip_socket_unregister_mld6_membership(int s, unsigned int if_idx, const ip6_add
   for (i = 0; i < LWIP_SOCKET_MAX_MEMBERSHIPS; i++) {
     if ((socket_ipv6_multicast_memberships[i].sock   == sock) &&
         (socket_ipv6_multicast_memberships[i].if_idx == if_idx) &&
-        ip6_addr_cmp(&socket_ipv6_multicast_memberships[i].multi_addr, multi_addr)) {
+        ip6_addr_eq(&socket_ipv6_multicast_memberships[i].multi_addr, multi_addr)) {
       socket_ipv6_multicast_memberships[i].sock   = NULL;
       socket_ipv6_multicast_memberships[i].if_idx = NETIF_NO_INDEX;
       ip6_addr_set_zero(&socket_ipv6_multicast_memberships[i].multi_addr);

@@ -1,6 +1,6 @@
 /**
  * @file
- * raw API (to be used from TCPIP thread)\n
+ * raw API (to be used from TCPIP thread)<br>
  * See also @ref raw_raw
  */
 
@@ -101,10 +101,6 @@ struct raw_pcb {
 
 /* The following functions is the application layer interface to the
    RAW code. */
-#ifdef LOSCFG_NET_CONTAINER
-void set_raw_pcb_net_group(struct raw_pcb *pcb, struct net_group *group);
-struct net_group *get_net_group_from_raw_pcb(struct raw_pcb *pcb);
-#endif
 struct raw_pcb * raw_new        (u8_t proto);
 struct raw_pcb * raw_new_ip_type(u8_t type, u8_t proto);
 void             raw_remove     (struct raw_pcb *pcb);

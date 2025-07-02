@@ -60,9 +60,6 @@ extern "C" {
 #define LOWPAN6_TMR_INTERVAL 1000
 
 void lowpan6_tmr(void);
-#if LWIP_LOWPOWER
-u32_t lowpan6_tmr_tick(void);
-#endif
 
 err_t lowpan6_set_context(u8_t idx, const ip6_addr_t * context);
 err_t lowpan6_set_short_addr(u8_t addr_high, u8_t addr_low);

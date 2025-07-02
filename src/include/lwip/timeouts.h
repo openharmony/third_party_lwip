@@ -43,15 +43,11 @@
 #if !NO_SYS
 #include "lwip/sys.h"
 #endif
-#if LWIP_LOWPOWER
-#include "lwip/lowpower.h"
-#endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#if !LWIP_LOWPOWER
 #ifndef LWIP_DEBUG_TIMERNAMES
 #ifdef LWIP_DEBUG
 #define LWIP_DEBUG_TIMERNAMES SYS_DEBUG
@@ -124,7 +120,7 @@ void lwip_cyclic_timer(void *arg);
 #endif
 
 #endif /* LWIP_TIMERS */
-#endif /* !LWIP_LOWPOWER */
+
 #ifdef __cplusplus
 }
 #endif

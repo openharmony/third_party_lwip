@@ -62,19 +62,11 @@ extern "C" {
 #define IP_OPTIONS_SEND   (LWIP_IPV4 && LWIP_IGMP)
 
 #define ip_init() /* Compatibility define, no init needed. */
-#ifdef LOSCFG_NET_CONTAINER
-struct netif *ip4_route(const ip4_addr_t *dest, struct net_group *group);
-#else
 struct netif *ip4_route(const ip4_addr_t *dest);
-#endif
 #if LWIP_IPV4_SRC_ROUTING
 struct netif *ip4_route_src(const ip4_addr_t *src, const ip4_addr_t *dest);
 #else /* LWIP_IPV4_SRC_ROUTING */
-#ifdef LOSCFG_NET_CONTAINER
-#define ip4_route_src(src, dest, group) ip4_route(dest, group)
-#else
 #define ip4_route_src(src, dest) ip4_route(dest)
-#endif
 #endif /* LWIP_IPV4_SRC_ROUTING */
 err_t ip4_input(struct pbuf *p, struct netif *inp);
 err_t ip4_output(struct pbuf *p, const ip4_addr_t *src, const ip4_addr_t *dest,
@@ -115,5 +107,3 @@ void ip4_debug_print(struct pbuf *p);
 #endif /* LWIP_IPV4 */
 
 #endif /* LWIP_HDR_IP_H */
-
-

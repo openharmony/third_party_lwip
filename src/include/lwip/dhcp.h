@@ -45,12 +45,25 @@
 #include "lwip/netif.h"
 #include "lwip/udp.h"
 
+#if LWIP_DHCP_DOES_ACD_CHECK
+#include "lwip/acd.h"
+#endif /* LWIP_DHCP_DOES_ACD_CHECK */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+/** Define DHCP_TIMEOUT_SIZE_T in opt.h if you want use a different integer than u16_t.
+ *  Especially useful if DHCP_COARSE_TIMER_SECS is in smaller units, so timeouts easily reach UINT16_MAX and more */
+#ifdef DHCP_TIMEOUT_SIZE_T
+typedef DHCP_TIMEOUT_SIZE_T dhcp_timeout_t;
+#else /* DHCP_TIMEOUT_SIZE_T */
+typedef u16_t dhcp_timeout_t;
+#endif /* DHCP_TIMEOUT_SIZE_T*/
 /** period (in seconds) of the application calling dhcp_coarse_tmr() */
+#ifndef DHCP_COARSE_TIMER_SECS
 #define DHCP_COARSE_TIMER_SECS  60
+#endif /* DHCP_COARSE_TIMER_SECS */
 /** period (in milliseconds) of the application calling dhcp_coarse_tmr() */
 #define DHCP_COARSE_TIMER_MSECS (DHCP_COARSE_TIMER_SECS * 1000UL)
 /** period (in milliseconds) of the application calling dhcp_fine_tmr() */
@@ -58,40 +71,8 @@ extern "C" {
 
 #define DHCP_BOOT_FILE_LEN      128U
 
-#if LWIP_DNS && LWIP_DHCP_MAX_DNS_SERVERS
-#if DNS_MAX_SERVERS > LWIP_DHCP_MAX_DNS_SERVERS
-#define LWIP_DHCP_PROVIDE_DNS_SERVERS LWIP_DHCP_MAX_DNS_SERVERS
-#else
-#define LWIP_DHCP_PROVIDE_DNS_SERVERS DNS_MAX_SERVERS
-#endif
-#else
-#define LWIP_DHCP_PROVIDE_DNS_SERVERS 0
-#endif
-
-/** Option handling: options are parsed in dhcp_parse_reply
- * and saved in an array where other functions can load them from.
- * This might be moved into the struct dhcp (not necessarily since
- * lwIP is single-threaded and the array is only used while in recv
- * callback). */
-enum dhcp_option_idx {
-  DHCP_OPTION_IDX_OVERLOAD = 0,
-  DHCP_OPTION_IDX_MSG_TYPE,
-  DHCP_OPTION_IDX_SERVER_ID,
-  DHCP_OPTION_IDX_LEASE_TIME,
-  DHCP_OPTION_IDX_T1,
-  DHCP_OPTION_IDX_T2,
-  DHCP_OPTION_IDX_SUBNET_MASK,
-  DHCP_OPTION_IDX_ROUTER,
-#if LWIP_DHCP_PROVIDE_DNS_SERVERS
-  DHCP_OPTION_IDX_DNS_SERVER,
-  DHCP_OPTION_IDX_DNS_SERVER_LAST = DHCP_OPTION_IDX_DNS_SERVER + LWIP_DHCP_PROVIDE_DNS_SERVERS - 1,
-#endif /* LWIP_DHCP_PROVIDE_DNS_SERVERS */
-#if LWIP_DHCP_GET_NTP_SRV
-  DHCP_OPTION_IDX_NTP_SERVER,
-  DHCP_OPTION_IDX_NTP_SERVER_LAST = DHCP_OPTION_IDX_NTP_SERVER + LWIP_DHCP_MAX_NTP_SERVERS - 1,
-#endif /* LWIP_DHCP_GET_NTP_SRV */
-  DHCP_OPTION_IDX_MAX
-};
+#define DHCP_FLAG_SUBNET_MASK_GIVEN 0x01
+#define DHCP_FLAG_EXTERNAL_MEM      0x02
 
 /* AutoIP cooperation flags (struct dhcp.autoip_coop_state) */
 typedef enum {
@@ -109,18 +90,16 @@ struct dhcp
   u8_t state;
   /** retries of current request */
   u8_t tries;
-#if LWIP_DHCP_AUTOIP_COOP
-  u8_t autoip_coop_state;
-#endif
-  u8_t subnet_mask_given;
+  /** see DHCP_FLAG_* */
+  u8_t flags;
 
-  u16_t request_timeout; /* #ticks with period DHCP_FINE_TIMER_SECS for request timeout */
-  u16_t t1_timeout;  /* #ticks with period DHCP_COARSE_TIMER_SECS for renewal time */
-  u16_t t2_timeout;  /* #ticks with period DHCP_COARSE_TIMER_SECS for rebind time */
-  u16_t t1_renew_time;  /* #ticks with period DHCP_COARSE_TIMER_SECS until next renew try */
-  u16_t t2_rebind_time; /* #ticks with period DHCP_COARSE_TIMER_SECS until next rebind try */
-  u16_t lease_used; /* #ticks with period DHCP_COARSE_TIMER_SECS since last received DHCP ack */
-  u16_t t0_timeout; /* #ticks with period DHCP_COARSE_TIMER_SECS for lease time */
+  dhcp_timeout_t request_timeout; /* #ticks with period DHCP_FINE_TIMER_SECS for request timeout */
+  dhcp_timeout_t t1_timeout;  /* #ticks with period DHCP_COARSE_TIMER_SECS for renewal time */
+  dhcp_timeout_t t2_timeout;  /* #ticks with period DHCP_COARSE_TIMER_SECS for rebind time */
+  dhcp_timeout_t t1_renew_time;  /* #ticks with period DHCP_COARSE_TIMER_SECS until next renew try */
+  dhcp_timeout_t t2_rebind_time; /* #ticks with period DHCP_COARSE_TIMER_SECS until next rebind try */
+  dhcp_timeout_t lease_used; /* #ticks with period DHCP_COARSE_TIMER_SECS since last received DHCP ack */
+  dhcp_timeout_t t0_timeout; /* #ticks with period DHCP_COARSE_TIMER_SECS for lease time */
   ip_addr_t server_ip_addr; /* dhcp server address that offered this lease (ip_addr_t because passed to UDP) */
   ip4_addr_t offered_ip_addr;
   ip4_addr_t offered_sn_mask;
@@ -133,10 +112,10 @@ struct dhcp
   ip4_addr_t offered_si_addr;
   char boot_file_name[DHCP_BOOT_FILE_LEN];
 #endif /* LWIP_DHCP_BOOTPFILE */
-  /** Holds the decoded option values, only valid while in dhcp_recv. */
-  u32_t rx_options_val[DHCP_OPTION_IDX_MAX];
-  /** Holds a flag which option was received and is contained in dhcp_rx_options_val, only valid while in dhcp_recv. */
-  u8_t rx_options_given[DHCP_OPTION_IDX_MAX];
+#if LWIP_DHCP_DOES_ACD_CHECK
+  /** acd struct */
+  struct acd acd;
+#endif /* LWIP_DHCP_DOES_ACD_CHECK */
 };
 
 
@@ -150,20 +129,13 @@ err_t dhcp_release(struct netif *netif);
 void dhcp_stop(struct netif *netif);
 void dhcp_release_and_stop(struct netif *netif);
 void dhcp_inform(struct netif *netif);
-void dhcp_network_changed(struct netif *netif);
-#if DHCP_DOES_ARP_CHECK
-void dhcp_arp_reply(struct netif *netif, const ip4_addr_t *addr);
-#endif
+void dhcp_network_changed_link_up(struct netif *netif);
+
 u8_t dhcp_supplied_address(const struct netif *netif);
 /* to be called every minute */
 void dhcp_coarse_tmr(void);
 /* to be called every half second */
 void dhcp_fine_tmr(void);
-
-#if LWIP_LOWPOWER
-u32_t dhcp_coarse_tmr_tick(void);
-u32_t dhcp_fine_tmr_tick(void);
-#endif
 
 #if LWIP_DHCP_GET_NTP_SRV
 /** This function must exist, in other to add offered NTP servers to

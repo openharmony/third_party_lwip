@@ -49,9 +49,6 @@
 #include "lwip/pbuf.h"
 #include "lwip/etharp.h"
 #include "netif/ethernet.h"
-#if LWIP_LOWPOWER
-#include "lwip/lowpower.h"
-#endif
 
 #define TCPIP_MSG_VAR_REF(name)     API_VAR_REF(name)
 #define TCPIP_MSG_VAR_DECLARE(name) API_VAR_DECLARE(struct tcpip_msg, name)
@@ -71,12 +68,20 @@ sys_mutex_t lock_tcpip_core;
 static void tcpip_thread_handle_msg(struct tcpip_msg *msg);
 
 #if !LWIP_TIMERS
-/* wait for a message with timers disabled (e.g. pass a timer-check trigger into tcpip_thread) */
-#define TCPIP_MBOX_FETCH(mbox, msg) sys_mbox_fetch(mbox, msg)
+
+/** Wait for a message with timers disabled (e.g. pass a timer-check trigger into tcpip_thread) */
+static void
+tcpip_mbox_fetch(sys_mbox_t* mbox, void** msg)
+{
+  LWIP_ASSERT_CORE_LOCKED();
+
+  UNLOCK_TCPIP_CORE();
+  sys_mbox_fetch(mbox, msg);
+  LOCK_TCPIP_CORE();
+}
+
 #else /* !LWIP_TIMERS */
-/* wait for a message, timeouts are processed while waiting */
-#define TCPIP_MBOX_FETCH(mbox, msg) tcpip_timeouts_mbox_fetch(mbox, msg)
-#if !LWIP_LOWPOWER
+
 /**
  * Wait (forever) for a message to arrive in an mbox.
  * While waiting, timeouts are processed.
@@ -85,7 +90,7 @@ static void tcpip_thread_handle_msg(struct tcpip_msg *msg);
  * @param msg the place to store the message
  */
 static void
-tcpip_timeouts_mbox_fetch(sys_mbox_t *mbox, void **msg)
+tcpip_mbox_fetch(sys_mbox_t *mbox, void **msg)
 {
   u32_t sleeptime, res;
 
@@ -115,7 +120,6 @@ again:
     goto again;
   }
 }
-#endif /* !LWIP_LOWPOWER */
 #endif /* !LWIP_TIMERS */
 
 /**
@@ -144,7 +148,7 @@ tcpip_thread(void *arg)
   while (1) {                          /* MAIN Loop */
     LWIP_TCPIP_THREAD_ALIVE();
     /* wait for a message, timeouts are processed while waiting */
-    TCPIP_MBOX_FETCH(&tcpip_mbox, (void **)&msg);
+    tcpip_mbox_fetch(&tcpip_mbox, (void **)&msg);
     if (msg == NULL) {
       LWIP_DEBUGF(TCPIP_DEBUG, ("tcpip_thread: invalid message: NULL\n"));
       LWIP_ASSERT("tcpip_thread: invalid message", 0);
@@ -170,6 +174,11 @@ tcpip_thread_handle_msg(struct tcpip_msg *msg)
       LWIP_DEBUGF(TCPIP_DEBUG, ("tcpip_thread: API CALL message %p\n", (void *)msg));
       msg->msg.api_call.arg->err = msg->msg.api_call.function(msg->msg.api_call.arg);
       sys_sem_signal(msg->msg.api_call.sem);
+      break;
+    case TCPIP_MSG_CALLBACK_STATIC_WAIT:
+      LWIP_DEBUGF(TCPIP_DEBUG, ("tcpip_thread: CALLBACK WAIT message %p\n", (void *)msg));
+      msg->msg.cb_wait.function(msg->msg.cb_wait.ctx);
+      sys_sem_signal(msg->msg.cb_wait.sem);
       break;
 #endif /* !LWIP_TCPIP_CORE_LOCKING */
 
@@ -206,75 +215,13 @@ tcpip_thread_handle_msg(struct tcpip_msg *msg)
       LWIP_DEBUGF(TCPIP_DEBUG, ("tcpip_thread: CALLBACK_STATIC %p\n", (void *)msg));
       msg->msg.cb.function(msg->msg.cb.ctx);
       break;
-#if LWIP_LOWPOWER
-    /* just wake up thread do nothing */
-    case TCPIP_MSG_NA:
-      if (msg->msg.lowpower.type == LOW_BLOCK) {
-        LOWPOWER_SIGNAL(msg->msg.lowpower.wait_up);
-      } else {
-        memp_free(MEMP_TCPIP_MSG_LOWPOWER, msg);
-      }
-      sys_timeout_set_wake_time(LOW_TMR_DELAY);
-      break;
-#endif
+
     default:
       LWIP_DEBUGF(TCPIP_DEBUG, ("tcpip_thread: invalid message: %d\n", msg->type));
       LWIP_ASSERT("tcpip_thread: invalid message", 0);
       break;
   }
 }
-
-#if LWIP_LOWPOWER
-/* send a na msg to wake up tcpip_thread */
-void
-tcpip_send_msg_na(enum lowpower_msg_type type)
-{
-  struct tcpip_msg *msg = NULL;
-  err_t val;
-
-  /* is not used lowpower mode */
-  if ((type != LOW_FORCE_NON_BLOCK) && (get_lowpowper_mod() == LOW_TMR_NORMAL_MOD)) {
-    return;
-  }
-  if (sys_timeout_waiting_long() == 0) {
-    return;
-  }
-
-  msg = (struct tcpip_msg *)memp_malloc(MEMP_TCPIP_MSG_LOWPOWER);
-  if (msg == NULL) {
-    LWIP_DEBUGF(LOWPOWER_DEBUG, ("tcpip_send_msg_na alloc faild\n"));
-    return;
-  }
-
-  /* just wake up thread if nonblock */
-  msg->type = TCPIP_MSG_NA;
-  msg->msg.lowpower.type = type;
-
-  if (type == LOW_BLOCK) {
-    LOWPOWER_SEM_NEW(msg->msg.lowpower.wait_up, val);
-    if (val != ERR_OK) {
-      LWIP_DEBUGF(LOWPOWER_DEBUG, ("alloc sem faild\n"));
-      memp_free(MEMP_TCPIP_MSG_LOWPOWER, msg);
-      return;
-    }
-  }
-
-  if (sys_mbox_trypost(&tcpip_mbox, msg) != ERR_OK) {
-    if (type == LOW_BLOCK) {
-      LOWPOWER_SEM_FREE(msg->msg.lowpower.wait_up);
-    }
-    memp_free(MEMP_TCPIP_MSG_LOWPOWER, msg);
-    LWIP_DEBUGF(LOWPOWER_DEBUG, ("tcpip_send_msg_na post faild\n"));
-    return;
-  }
-
-  if (type == LOW_BLOCK) {
-    LOWPOWER_SEM_WAIT(msg->msg.lowpower.wait_up);
-    LOWPOWER_SEM_FREE(msg->msg.lowpower.wait_up);
-    memp_free(MEMP_TCPIP_MSG_LOWPOWER, msg);
-  }
-}
-#endif /* LWIP_LOWPOWER */
 
 #ifdef TCPIP_THREAD_TEST
 /** Work on queued items in single-threaded test mode */
@@ -309,9 +256,6 @@ tcpip_inpkt(struct pbuf *p, struct netif *inp, netif_input_fn input_fn)
 #if LWIP_TCPIP_CORE_LOCKING_INPUT
   err_t ret;
   LWIP_DEBUGF(TCPIP_DEBUG, ("tcpip_inpkt: PACKET %p/%p\n", (void *)p, (void *)inp));
-#if LWIP_LOWPOWER
-  tcpip_send_msg_na(LOW_BLOCK);
-#endif
   LOCK_TCPIP_CORE();
   ret = input_fn(p, inp);
   UNLOCK_TCPIP_CORE();
@@ -493,7 +437,7 @@ tcpip_untimeout(sys_timeout_handler h, void *arg)
 
 /**
  * Sends a message to TCPIP thread to call a function. Caller thread blocks on
- * on a provided semaphore, which ist NOT automatically signalled by TCPIP thread,
+ * on a provided semaphore, which is NOT automatically signalled by TCPIP thread,
  * this has to be done by the user.
  * It is recommended to use LWIP_TCPIP_CORE_LOCKING since this is the way
  * with least runtime overhead.
@@ -508,9 +452,6 @@ tcpip_send_msg_wait_sem(tcpip_callback_fn fn, void *apimsg, sys_sem_t *sem)
 {
 #if LWIP_TCPIP_CORE_LOCKING
   LWIP_UNUSED_ARG(sem);
-#if LWIP_LOWPOWER
-  tcpip_send_msg_na(LOW_BLOCK);
-#endif
   LOCK_TCPIP_CORE();
   fn(apimsg);
   UNLOCK_TCPIP_CORE();
@@ -547,9 +488,6 @@ tcpip_api_call(tcpip_api_call_fn fn, struct tcpip_api_call_data *call)
 {
 #if LWIP_TCPIP_CORE_LOCKING
   err_t err;
-#if LWIP_LOWPOWER
-  tcpip_send_msg_na(LOW_BLOCK);
-#endif
   LOCK_TCPIP_CORE();
   err = fn(call);
   UNLOCK_TCPIP_CORE();
@@ -595,7 +533,7 @@ tcpip_api_call(tcpip_api_call_fn fn, struct tcpip_api_call_data *call)
  * e.g. the message is allocated once and posted several times from an IRQ
  * using tcpip_callbackmsg_trycallback().
  * Example usage: Trigger execution of an ethernet IRQ DPC routine in lwIP thread context.
- * 
+ *
  * @param function the function to call
  * @param ctx parameter passed to function
  * @return a struct pointer to pass to tcpip_callbackmsg_trycallback().
@@ -663,6 +601,49 @@ tcpip_callbackmsg_trycallback_fromisr(struct tcpip_callback_msg *msg)
 {
   LWIP_ASSERT("Invalid mbox", sys_mbox_valid_val(tcpip_mbox));
   return sys_mbox_trypost_fromisr(&tcpip_mbox, msg);
+}
+
+/**
+ * Sends a message to TCPIP thread to call a function. Caller thread blocks
+ * until the function returns.
+ * It is recommended to use LWIP_TCPIP_CORE_LOCKING (preferred) or
+ * LWIP_NETCONN_SEM_PER_THREAD.
+ * If not, a semaphore is created and destroyed on every call which is usually
+ * an expensive/slow operation.
+ *
+ * @param function the function to call
+ * @param ctx parameter passed to f
+ * @return ERR_OK if the function was called, another err_t if not
+ */
+err_t
+tcpip_callback_wait(tcpip_callback_fn function, void *ctx)
+{
+#if LWIP_TCPIP_CORE_LOCKING
+  LOCK_TCPIP_CORE();
+  function(ctx);
+  UNLOCK_TCPIP_CORE();
+  return ERR_OK;
+#else /* LWIP_TCPIP_CORE_LOCKING */
+  err_t err;
+  sys_sem_t sem;
+  struct tcpip_msg msg;
+
+  LWIP_ASSERT("Invalid mbox", sys_mbox_valid_val(tcpip_mbox));
+
+  err = sys_sem_new(&sem, 0);
+  if (err != ERR_OK) {
+    return err;
+  }
+
+  msg.type = TCPIP_MSG_CALLBACK_STATIC_WAIT;
+  msg.msg.cb_wait.function = function;
+  msg.msg.cb_wait.ctx = ctx;
+  msg.msg.cb_wait.sem = &sem;
+  sys_mbox_post(&tcpip_mbox, &msg);
+  sys_arch_sem_wait(&sem, 0);
+  sys_sem_free(&sem);
+  return ERR_OK;
+#endif /* LWIP_TCPIP_CORE_LOCKING */
 }
 
 /**

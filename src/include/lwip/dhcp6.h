@@ -95,10 +95,6 @@ extern void dhcp6_set_ntp_servers(u8_t num_ntp_servers, const ip_addr_t* ntp_ser
 
 #define netif_dhcp6_data(netif) ((struct dhcp6*)netif_get_client_data(netif, LWIP_NETIF_CLIENT_DATA_INDEX_DHCP6))
 
-#if LWIP_LOWPOWER
-u32_t dhcp6_tmr_tick();
-#endif
-
 #ifdef __cplusplus
 }
 #endif

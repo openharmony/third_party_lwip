@@ -43,6 +43,10 @@
 
 #if LWIP_SOCKET /* don't build if not configured for use in lwipopts.h */
 
+#if LWIP_SOCKET_EXTERNAL_HEADERS
+#include LWIP_SOCKET_EXTERNAL_HEADER_SOCKETS_H
+#else /* LWIP_SOCKET_EXTERNAL_HEADERS */
+
 #include "lwip/ip_addr.h"
 #include "lwip/netif.h"
 #include "lwip/err.h"
@@ -54,7 +58,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#ifndef LWIP_SOCKET_STDINCLUDE
+
+/* sockaddr and pals include length fields */
+#define LWIP_SOCKET_HAVE_SA_LEN  1
+
 /* If your port already typedef's sa_family_t, define SA_FAMILY_T_DEFINED
    to prevent this code from redefining it. */
 #if !defined(sa_family_t) && !defined(SA_FAMILY_T_DEFINED)
@@ -124,11 +131,13 @@ struct iovec {
 };
 #endif
 
+typedef int msg_iovlen_t;
+
 struct msghdr {
   void         *msg_name;
   socklen_t     msg_namelen;
   struct iovec *msg_iov;
-  int           msg_iovlen;
+  msg_iovlen_t  msg_iovlen;
   void         *msg_control;
   socklen_t     msg_controllen;
   int           msg_flags;
@@ -400,7 +409,7 @@ typedef struct ipv6_mreq {
  * we restrict parameters to at most 128 bytes.
  */
 #if !defined(FIONREAD) || !defined(FIONBIO)
-#define IOCPARM_MASK    0x7fU           /* parameters must be < 128 bytes */
+#define IOCPARM_MASK    0x7fUL          /* parameters must be < 128 bytes */
 #define IOC_VOID        0x20000000UL    /* no parameters */
 #define IOC_OUT         0x40000000UL    /* copy out parameters */
 #define IOC_IN          0x80000000UL    /* copy in parameters */
@@ -524,7 +533,17 @@ struct timeval {
   long    tv_usec;        /* and microseconds */
 };
 #endif /* LWIP_TIMEVAL_PRIVATE */
-#endif /* LWIP_SOCKET_STDINCLUDE */
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* LWIP_SOCKET_EXTERNAL_HEADERS */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define lwip_socket_init() /* Compatibility define, no init needed. */
 void lwip_socket_thread_init(void); /* LWIP_NETCONN_SEM_PER_THREAD==1: initialize thread-local semaphore */
 void lwip_socket_thread_cleanup(void); /* LWIP_NETCONN_SEM_PER_THREAD==1: destroy thread-local semaphore */
@@ -607,25 +626,6 @@ int lwip_ioctl(int s, long cmd, void *argp);
 int lwip_fcntl(int s, int cmd, int val);
 const char *lwip_inet_ntop(int af, const void *src, char *dst, socklen_t size);
 int lwip_inet_pton(int af, const char *src, void *dst);
-
-#if LWIP_ENABLE_DISTRIBUTED_NET
-
-int lwip_connect_internal(int s, const struct sockaddr *name, socklen_t namelen);
-
-int lwip_close_internal(int s);
-
-#if LWIP_USE_GET_HOST_BY_NAME_EXTERNAL
-ssize_t lwip_sendto_internal(int s, const void *data, size_t size, int flags, const struct sockaddr *to,
-                             socklen_t tolen);
-
-#if LWIP_DISTRIBUTED_NET_ENABLE_SENDMSG
-ssize_t lwip_sendmsg_internal(int s, const struct msghdr *msg, int flags);
-#endif
-
-ssize_t lwip_recvfrom_internal(int s, void *mem, size_t len, int flags, struct sockaddr *from, socklen_t *fromlen);
-#endif /* LWIP_USE_GET_HOST_BY_NAME_EXTERNAL */
-
-#endif
 
 #if LWIP_COMPAT_SOCKETS
 #if LWIP_COMPAT_SOCKETS != 2

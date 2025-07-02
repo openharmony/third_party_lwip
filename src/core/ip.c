@@ -164,18 +164,4 @@ ip_input(struct pbuf *p, struct netif *inp)
 
 #endif /* LWIP_IPV4 && LWIP_IPV6 */
 
-#ifdef LOSCFG_NET_CONTAINER
-void set_ippcb_net_group(struct ip_pcb *pcb, struct net_group *group)
-{
-    get_default_net_group_ops()->set_ippcb_net_group(pcb, group);
-}
-
-struct net_group *get_net_group_from_ippcb(struct ip_pcb *pcb)
-{
-    if (pcb != NULL) {
-      return get_default_net_group_ops()->get_net_group_from_ippcb(pcb);
-    }
-    return NULL;
-}
-#endif
 #endif /* LWIP_IPV4 || LWIP_IPV6 */

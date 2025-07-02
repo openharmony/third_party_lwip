@@ -46,6 +46,7 @@
 
 #include "lwip/ip_addr.h"
 #include "lwip/def.h"
+#include "lwip/netif.h"
 
 #include <string.h>
 
@@ -57,7 +58,7 @@
 const ip_addr_t ip6_addr_any = IPADDR6_INIT(0ul, 0ul, 0ul, 0ul);
 
 #define lwip_xchar(i)        ((char)((i) < 10 ? '0' + (i) : 'A' + (i) - 10))
-#if 0 // this ip6addr_aton is buggy, fixed in `fixme.c'
+
 /**
  * Check whether "cp" is a valid ascii representation
  * of an IPv6 address and convert to a binary address.
@@ -185,6 +186,17 @@ fix_byte_order_and_return:
     }
 
     ip6_addr_clear_zone(addr);
+#if LWIP_IPV6_SCOPES
+    if (*s == '%') {
+      const char *scopestr = s + 1;
+      if (*scopestr) {
+        struct netif *netif = netif_find(scopestr);
+        if (netif) {
+          ip6_addr_assign_zone(addr, IP6_UNKNOWN, netif);
+        }
+      }
+    }
+#endif
   }
 
   if (current_block_index != 7) {
@@ -193,7 +205,7 @@ fix_byte_order_and_return:
 
   return 1;
 }
-#endif
+
 /**
  * Convert numeric IPv6 address into ASCII representation.
  * returns ptr to static buffer; not reentrant!

@@ -1,6 +1,6 @@
 /**
  * @file
- * UDP API (to be used from TCPIP thread)\n
+ * UDP API (to be used from TCPIP thread)<br>
  * See also @ref udp_raw
  */
 
@@ -116,10 +116,6 @@ extern struct udp_pcb *udp_pcbs;
 
 /* The following functions is the application layer interface to the
    UDP code. */
-#ifdef LOSCFG_NET_CONTAINER
-void set_udp_pcb_net_group(struct udp_pcb *pcb, struct net_group *group);
-struct net_group *get_net_group_from_udp_pcb(struct udp_pcb *pcb);
-#endif
 struct udp_pcb * udp_new        (void);
 struct udp_pcb * udp_new_ip_type(u8_t type);
 void             udp_remove     (struct udp_pcb *pcb);

@@ -106,8 +106,8 @@ PACK_STRUCT_END
 #endif
 
 #define IP_ADDRESSES_AND_ID_MATCH(iphdrA, iphdrB)  \
-  (ip4_addr_cmp(&(iphdrA)->src, &(iphdrB)->src) && \
-   ip4_addr_cmp(&(iphdrA)->dest, &(iphdrB)->dest) && \
+  (ip4_addr_eq(&(iphdrA)->src, &(iphdrB)->src) && \
+   ip4_addr_eq(&(iphdrA)->dest, &(iphdrB)->dest) && \
    IPH_ID(iphdrA) == IPH_ID(iphdrB)) ? 1 : 0
 
 /* global variables */
@@ -212,26 +212,6 @@ ip_reass_free_complete_datagram(struct ip_reassdata *ipr, struct ip_reassdata *p
 
   return pbufs_freed;
 }
-
-#if LWIP_LOWPOWER
-#include "lwip/lowpower.h"
-u32_t
-ip_reass_tmr_tick(void)
-{
-  struct ip_reassdata *r = NULL;
-  u32_t tick = 0;
-  u32_t val;
-
-  r = reassdatagrams;
-  while (r != NULL) {
-    val = r->timer + 1;
-    SET_TMR_TICK(tick, val);
-    r = r->next;
-  }
-  LWIP_DEBUGF(LOWPOWER_DEBUG, ("%s tmr tick: %u\n", "ip_reass_tmr_tick", tick));
-  return tick;
-}
-#endif /* LWIP_LOWPOWER */
 
 #if IP_REASS_FREE_OLDEST
 /**

@@ -49,11 +49,10 @@
 extern "C" {
 #endif
 
-#ifndef LWIP_SOCKET_STDINCLUDE
 #ifndef IF_NAMESIZE
 #define IF_NAMESIZE NETIF_NAMESIZE
 #endif
-#endif /* LWIP_SOCKET_STDINCLUDE */
+
 char * lwip_if_indextoname(unsigned int ifindex, char *ifname);
 unsigned int lwip_if_nametoindex(const char *ifname);
 
