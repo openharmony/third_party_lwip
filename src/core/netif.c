@@ -1743,7 +1743,7 @@ netif_get_by_index(u8_t idx)
 
   return NULL;
 }
-
+#ifndef netif_find
 /**
  * @ingroup netif
  * Find a network interface by searching for its name
@@ -1780,7 +1780,7 @@ netif_find(const char *name)
   LWIP_DEBUGF(NETIF_DEBUG, ("netif_find: didn't find %c%c\n", name[0], name[1]));
   return NULL;
 }
-
+#endif /* netif_find */
 #if LWIP_NETIF_EXT_STATUS_CALLBACK
 /**
  * @ingroup netif
