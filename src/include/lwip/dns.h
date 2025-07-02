@@ -86,10 +86,6 @@ struct local_hostlist_entry {
 #endif /* DNS_LOCAL_HOSTLIST_IS_DYNAMIC */
 #endif /* DNS_LOCAL_HOSTLIST */
 
-#if LWIP_LOWPOWER
-u32_t dns_tmr_tick(void);
-#endif
-
 #if LWIP_IPV4
 extern const ip_addr_t dns_mquery_v4group;
 #endif /* LWIP_IPV4 */

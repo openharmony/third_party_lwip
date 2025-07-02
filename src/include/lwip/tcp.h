@@ -1,6 +1,6 @@
 /**
  * @file
- * TCP API (to be used from TCPIP thread)\n
+ * TCP API (to be used from TCPIP thread)<br>
  * See also @ref tcp_raw
  */
 
@@ -408,10 +408,6 @@ err_t lwip_tcp_event(void *arg, struct tcp_pcb *pcb,
 #endif /* LWIP_EVENT_API */
 
 /* Application program's interface: */
-#ifdef LOSCFG_NET_CONTAINER
-void set_tcp_pcb_net_group(struct tcp_pcb *pcb, struct net_group *group);
-struct net_group *get_net_group_from_tcp_pcb(const struct tcp_pcb *pcb);
-#endif
 struct tcp_pcb * tcp_new     (void);
 struct tcp_pcb * tcp_new_ip_type (u8_t type);
 
@@ -423,11 +419,6 @@ void             tcp_err     (struct tcp_pcb *pcb, tcp_err_fn err);
 void             tcp_accept  (struct tcp_pcb *pcb, tcp_accept_fn accept);
 #endif /* LWIP_CALLBACK_API */
 void             tcp_poll    (struct tcp_pcb *pcb, tcp_poll_fn poll, u8_t interval);
-
-#if LWIP_LOWPOWER
-u32_t tcp_fast_tmr_tick(void);
-u32_t tcp_slow_tmr_tick(void);
-#endif
 
 #define          tcp_set_flags(pcb, set_flags)     do { (pcb)->flags = (tcpflags_t)((pcb)->flags |  (set_flags)); } while(0)
 #define          tcp_clear_flags(pcb, clr_flags)   do { (pcb)->flags = (tcpflags_t)((pcb)->flags & (tcpflags_t)(~(clr_flags) & TCP_ALLFLAGS)); } while(0)
@@ -495,9 +486,9 @@ err_t            tcp_tcp_get_tcp_addrinfo(struct tcp_pcb *pcb, int local, ip_add
 
 #if LWIP_TCP_PCB_NUM_EXT_ARGS
 u8_t tcp_ext_arg_alloc_id(void);
-void tcp_ext_arg_set_callbacks(struct tcp_pcb *pcb, uint8_t id, const struct tcp_ext_arg_callbacks * const callbacks);
-void tcp_ext_arg_set(struct tcp_pcb *pcb, uint8_t id, void *arg);
-void *tcp_ext_arg_get(const struct tcp_pcb *pcb, uint8_t id);
+void tcp_ext_arg_set_callbacks(struct tcp_pcb *pcb, u8_t id, const struct tcp_ext_arg_callbacks * const callbacks);
+void tcp_ext_arg_set(struct tcp_pcb *pcb, u8_t id, void *arg);
+void *tcp_ext_arg_get(const struct tcp_pcb *pcb, u8_t id);
 #endif
 
 #ifdef __cplusplus

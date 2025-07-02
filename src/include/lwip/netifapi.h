@@ -96,11 +96,7 @@ err_t netifapi_netif_index_to_name(u8_t index, char *name);
 /** @ingroup netifapi_netif
   * @see netif_set_default()
   */
-#ifdef LOSCFG_NET_CONTAINER
-#define netifapi_netif_set_default(n)   netifapi_netif_common(n, netif_set_default2, NULL)
-#else
 #define netifapi_netif_set_default(n)   netifapi_netif_common(n, netif_set_default, NULL)
-#endif
 /** @ingroup netifapi_netif
   * @see netif_set_link_up()
   */
@@ -155,11 +151,6 @@ err_t netifapi_netif_index_to_name(u8_t index, char *name);
   * @see autoip_stop()
   */
 #define netifapi_autoip_stop(n)       netifapi_netif_common(n, NULL, autoip_stop)
-
-#if LWIP_LOWPOWER
-err_t netifapi_enable_lowpower(void);
-err_t netifapi_disable_lowpower(void);
-#endif
 
 #ifdef __cplusplus
 }

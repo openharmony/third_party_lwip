@@ -81,10 +81,6 @@ void nd6_adjust_mld_membership(struct netif *netif, s8_t addr_idx, u8_t new_stat
 #endif /* LWIP_IPV6_MLD */
 void nd6_restart_netif(struct netif *netif);
 
-#ifdef LWIP_LOWPOWER
-u32_t nd6_tmr_tick(void);
-#endif
-
 #ifdef __cplusplus
 }
 #endif

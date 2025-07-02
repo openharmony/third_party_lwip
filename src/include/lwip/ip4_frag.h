@@ -89,11 +89,6 @@ struct pbuf_custom_ref {
 #endif /* !LWIP_NETIF_TX_SINGLE_PBUF */
 
 err_t ip4_frag(struct pbuf *p, struct netif *netif, const ip4_addr_t *dest);
-
-#if LWIP_LOWPOWER
-u32_t ip_reass_tmr_tick(void);
-#endif /* LWIP_LOWPOWER */
-
 #endif /* IP_FRAG */
 
 #ifdef __cplusplus

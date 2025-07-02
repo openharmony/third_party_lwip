@@ -82,13 +82,9 @@ err_t  mld6_joingroup_netif(struct netif *netif, const ip6_addr_t *groupaddr);
 err_t  mld6_leavegroup(const ip6_addr_t *srcaddr, const ip6_addr_t *groupaddr);
 err_t  mld6_leavegroup_netif(struct netif *netif, const ip6_addr_t *groupaddr);
 
-#if LWIP_LOWPOWER
-u32_t mld6_tmr_tick(void);
-#endif
-
 /** @ingroup mld6
  * Get list head of MLD6 groups for netif.
- * Note: The allnodes group IP is NOT in the list, since it must always 
+ * Note: The allnodes group IP is NOT in the list, since it must always
  * be received for correct IPv6 operation.
  * @see @ref netif_set_mld_mac_filter()
  */

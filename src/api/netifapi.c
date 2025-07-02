@@ -63,11 +63,8 @@ netifapi_do_netif_add(struct tcpip_api_call_data *m)
   /* cast through void* to silence alignment warnings.
    * We know it works because the structs have been instantiated as struct netifapi_msg */
   struct netifapi_msg *msg = (struct netifapi_msg *)(void *)m;
-#ifdef LOSCFG_NET_CONTAINER
-  if (!netif_add( msg->netif, get_curr_process_net_group(),
-#else
+
   if (!netif_add( msg->netif,
-#endif
 #if LWIP_IPV4
                   API_EXPR_REF(msg->msg.add.ipaddr),
                   API_EXPR_REF(msg->msg.add.netmask),
@@ -125,11 +122,7 @@ netifapi_do_index_to_name(struct tcpip_api_call_data *m)
    * We know it works because the structs have been instantiated as struct netifapi_msg */
   struct netifapi_msg *msg = (struct netifapi_msg *)(void *)m;
 
-#ifdef LOSCFG_NET_CONTAINER
-  if (!netif_index_to_name(msg->msg.ifs.index, msg->msg.ifs.name, get_curr_process_net_group())) {
-#else
   if (!netif_index_to_name(msg->msg.ifs.index, msg->msg.ifs.name)) {
-#endif
     /* return failure via empty name */
     msg->msg.ifs.name[0] = '\0';
   }
@@ -383,46 +376,5 @@ netifapi_netif_index_to_name(u8_t idx, char *name)
   NETIFAPI_VAR_FREE(msg);
   return err;
 }
-
-#if LWIP_LOWPOWER
-static err_t
-netifapi_do_set_lowpower_mod(struct tcpip_api_call_data *m)
-{
-  struct netifapi_msg *msg = (struct netifapi_msg *)(void *)m;
-  enum lowpower_mod mod = msg->msg.lp.mod;
-  set_lowpower_mod(mod);
-  return ERR_OK;
-}
-
-err_t
-netifapi_enable_lowpower(void)
-{
-  err_t err;
-  NETIFAPI_VAR_DECLARE(msg);
-
-  NETIFAPI_VAR_ALLOC(msg);
-
-  NETIFAPI_VAR_REF(msg).msg.lp.mod = LOW_TMR_LOWPOWER_MOD;
-
-  err = tcpip_api_call(netifapi_do_set_lowpower_mod, &API_VAR_REF(msg).call);
-  NETIFAPI_VAR_FREE(msg);
-  return err;
-}
-
-err_t
-netifapi_disable_lowpower(void)
-{
-  err_t err;
-  NETIFAPI_VAR_DECLARE(msg);
-
-  NETIFAPI_VAR_ALLOC(msg);
-
-  NETIFAPI_VAR_REF(msg).msg.lp.mod = LOW_TMR_NORMAL_MOD;
-
-  err = tcpip_api_call(netifapi_do_set_lowpower_mod, &API_VAR_REF(msg).call);
-  NETIFAPI_VAR_FREE(msg);
-  return err;
-}
-#endif /* LWIP_LOWPOWER */
 
 #endif /* LWIP_NETIF_API */
