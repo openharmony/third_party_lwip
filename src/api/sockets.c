@@ -330,6 +330,11 @@ static volatile int select_cb_ctr;
 static struct lwip_select_cb *select_cb_list;
 #endif /* LWIP_SOCKET_SELECT || LWIP_SOCKET_POLL */
 
+#define sock_set_errno(sk, e) do { \
+  const int sockerr = (e); \
+  set_errno(sockerr); \
+} while (0)
+
 /* Forward declaration of some functions */
 #if LWIP_SOCKET_SELECT || LWIP_SOCKET_POLL
 static void event_callback(struct netconn *conn, enum netconn_evt evt, u16_t len);
