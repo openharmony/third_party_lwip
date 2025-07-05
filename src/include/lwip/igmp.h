@@ -100,10 +100,10 @@ err_t  igmp_leavegroup_netif(struct netif *netif, const ip4_addr_t *groupaddr);
 void   igmp_tmr(void);
 
 #if LWIP_LOWPOWER
-u32_t igmp_tmr_tick(void);
+u32_t  igmp_tmr_tick(void);
 #endif
 
-/** @ingroup igmp 
+/** @ingroup igmp
  * Get list head of IGMP groups for netif.
  * Note: The allsystems group IP is contained in the list as first entry.
  * @see @ref netif_set_igmp_mac_filter()
