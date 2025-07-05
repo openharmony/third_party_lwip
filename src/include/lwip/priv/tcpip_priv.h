@@ -126,7 +126,8 @@ enum tcpip_msg_type {
   TCPIP_MSG_CALLBACK_STATIC,
 #if LWIP_LOWPOWER
   TCPIP_MSG_NA,
-#endif
+#endif /* LWIP_LOWPOWER */
+  TCPIP_MSG_CALLBACK_STATIC_WAIT
 };
 
 struct tcpip_msg {
@@ -142,6 +143,11 @@ struct tcpip_msg {
       struct tcpip_api_call_data *arg;
       sys_sem_t *sem;
     } api_call;
+    struct {
+      tcpip_callback_fn function;
+      void *ctx;
+      sys_sem_t *sem;
+    } cb_wait;
 #endif /* LWIP_TCPIP_CORE_LOCKING */
 #if !LWIP_TCPIP_CORE_LOCKING_INPUT
     struct {
