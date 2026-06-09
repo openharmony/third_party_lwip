@@ -152,7 +152,11 @@ tcpip_thread(void *arg)
   while (1) {                          /* MAIN Loop */
     LWIP_TCPIP_THREAD_ALIVE();
     /* wait for a message, timeouts are processed while waiting */
+#if LWIP_LOWPOWER
+    tcpip_timeouts_mbox_fetch(&tcpip_mbox, (void **)&msg);
+#else
     tcpip_mbox_fetch(&tcpip_mbox, (void **)&msg);
+#endif
     if (msg == NULL) {
       LWIP_DEBUGF(TCPIP_DEBUG, ("tcpip_thread: invalid message: NULL\n"));
       LWIP_ASSERT("tcpip_thread: invalid message", 0);
