@@ -17,6 +17,7 @@ import("//developtools/profiler/build/config.gni")
 import("lwip.gni")
 
 ohos_shared_library("liblwip") {
+  branch_protector_ret = "pac_ret"
   sources = [
     "src/core/altcp_alloc.c",
     "src/core/altcp.c",
